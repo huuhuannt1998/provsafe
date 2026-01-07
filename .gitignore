@@ -8,10 +8,9 @@ venv/
 env/
 *.egg-info/
 
-# Results (keep structure but not data files)
-evaluation/results/**/*.json
-evaluation/results/**/*.csv
-!evaluation/results/.gitkeep
+# Results - ENABLED for sharing evaluation results
+# evaluation/results/**/*.json
+# evaluation/results/**/*.csv
 
 # Environment
 .env
