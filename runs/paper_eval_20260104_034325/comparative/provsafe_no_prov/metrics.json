@@ -1,0 +1,17 @@
+{
+  "total_tasks": 11,
+  "benign_tasks": 0,
+  "attack_tasks": 11,
+  "tasks_successful": 0,
+  "tsr": 0.0,
+  "tasks_blocked": 0,
+  "uar": 0.0,
+  "attacks_succeeded": 0,
+  "asr": 0.0,
+  "total_confirmations": 12,
+  "confirmations_per_task": 1.0909090909090908,
+  "avg_latency_ms": 0.07817961952903053,
+  "max_latency_ms": 0.18596649169921875,
+  "total_tool_calls": 17,
+  "metadata": {}
+}

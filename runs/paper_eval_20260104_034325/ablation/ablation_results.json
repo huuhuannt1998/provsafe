@@ -1,0 +1,198 @@
+[
+  {
+    "name": "Full System",
+    "description": "All features enabled",
+    "features": {
+      "rate_limiting": true,
+      "time_constraints": true,
+      "provenance": true,
+      "evidence_requirements": true,
+      "confirmations": true
+    },
+    "metrics": {
+      "total_tasks": 8,
+      "benign_tasks": 8,
+      "attack_tasks": 0,
+      "tasks_successful": 5,
+      "tsr": 0.625,
+      "tasks_blocked": 3,
+      "uar": 0.375,
+      "attacks_succeeded": 0,
+      "asr": 0.0,
+      "total_confirmations": 0,
+      "confirmations_per_task": 0.0,
+      "avg_latency_ms": 0.06255507469177246,
+      "max_latency_ms": 0.1800060272216797,
+      "total_tool_calls": 9,
+      "metadata": {}
+    }
+  },
+  {
+    "name": "No Provenance",
+    "description": "Disable provenance tracking",
+    "features": {
+      "rate_limiting": true,
+      "time_constraints": true,
+      "provenance": false,
+      "evidence_requirements": true,
+      "confirmations": true
+    },
+    "metrics": {
+      "total_tasks": 8,
+      "benign_tasks": 8,
+      "attack_tasks": 0,
+      "tasks_successful": 5,
+      "tsr": 0.625,
+      "tasks_blocked": 3,
+      "uar": 0.375,
+      "attacks_succeeded": 0,
+      "asr": 0.0,
+      "total_confirmations": 0,
+      "confirmations_per_task": 0.0,
+      "avg_latency_ms": 0.08487701416015625,
+      "max_latency_ms": 0.3750324249267578,
+      "total_tool_calls": 9,
+      "metadata": {}
+    }
+  },
+  {
+    "name": "No Rate Limiting",
+    "description": "Disable rate limiting",
+    "features": {
+      "rate_limiting": false,
+      "time_constraints": true,
+      "provenance": true,
+      "evidence_requirements": true,
+      "confirmations": true
+    },
+    "metrics": {
+      "total_tasks": 8,
+      "benign_tasks": 8,
+      "attack_tasks": 0,
+      "tasks_successful": 5,
+      "tsr": 0.625,
+      "tasks_blocked": 3,
+      "uar": 0.375,
+      "attacks_succeeded": 0,
+      "asr": 0.0,
+      "total_confirmations": 0,
+      "confirmations_per_task": 0.0,
+      "avg_latency_ms": 0.05450844764709473,
+      "max_latency_ms": 0.2048015594482422,
+      "total_tool_calls": 9,
+      "metadata": {}
+    }
+  },
+  {
+    "name": "No Time Constraints",
+    "description": "Disable time-of-day constraints",
+    "features": {
+      "rate_limiting": true,
+      "time_constraints": false,
+      "provenance": true,
+      "evidence_requirements": true,
+      "confirmations": true
+    },
+    "metrics": {
+      "total_tasks": 8,
+      "benign_tasks": 8,
+      "attack_tasks": 0,
+      "tasks_successful": 5,
+      "tsr": 0.625,
+      "tasks_blocked": 3,
+      "uar": 0.375,
+      "attacks_succeeded": 0,
+      "asr": 0.0,
+      "total_confirmations": 0,
+      "confirmations_per_task": 0.0,
+      "avg_latency_ms": 0.05990266799926758,
+      "max_latency_ms": 0.2281665802001953,
+      "total_tool_calls": 9,
+      "metadata": {}
+    }
+  },
+  {
+    "name": "No Evidence Requirements",
+    "description": "Disable evidence requirements",
+    "features": {
+      "rate_limiting": true,
+      "time_constraints": true,
+      "provenance": true,
+      "evidence_requirements": false,
+      "confirmations": true
+    },
+    "metrics": {
+      "total_tasks": 8,
+      "benign_tasks": 8,
+      "attack_tasks": 0,
+      "tasks_successful": 5,
+      "tsr": 0.625,
+      "tasks_blocked": 3,
+      "uar": 0.375,
+      "attacks_succeeded": 0,
+      "asr": 0.0,
+      "total_confirmations": 0,
+      "confirmations_per_task": 0.0,
+      "avg_latency_ms": 0.04023313522338867,
+      "max_latency_ms": 0.07987022399902344,
+      "total_tool_calls": 9,
+      "metadata": {}
+    }
+  },
+  {
+    "name": "No Confirmations",
+    "description": "Disable user confirmations",
+    "features": {
+      "rate_limiting": true,
+      "time_constraints": true,
+      "provenance": true,
+      "evidence_requirements": true,
+      "confirmations": false
+    },
+    "metrics": {
+      "total_tasks": 8,
+      "benign_tasks": 8,
+      "attack_tasks": 0,
+      "tasks_successful": 5,
+      "tsr": 0.625,
+      "tasks_blocked": 3,
+      "uar": 0.375,
+      "attacks_succeeded": 0,
+      "asr": 0.0,
+      "total_confirmations": 0,
+      "confirmations_per_task": 0.0,
+      "avg_latency_ms": 0.038504600524902344,
+      "max_latency_ms": 0.07605552673339844,
+      "total_tool_calls": 9,
+      "metadata": {}
+    }
+  },
+  {
+    "name": "Minimal System",
+    "description": "Only basic policy rules",
+    "features": {
+      "rate_limiting": false,
+      "time_constraints": false,
+      "provenance": false,
+      "evidence_requirements": false,
+      "confirmations": false
+    },
+    "metrics": {
+      "total_tasks": 8,
+      "benign_tasks": 8,
+      "attack_tasks": 0,
+      "tasks_successful": 5,
+      "tsr": 0.625,
+      "tasks_blocked": 3,
+      "uar": 0.375,
+      "attacks_succeeded": 0,
+      "asr": 0.0,
+      "total_confirmations": 0,
+      "confirmations_per_task": 0.0,
+      "avg_latency_ms": 0.03173947334289551,
+      "max_latency_ms": 0.06198883056640625,
+      "total_tool_calls": 9,
+      "metadata": {}
+    }
+  }
+]
