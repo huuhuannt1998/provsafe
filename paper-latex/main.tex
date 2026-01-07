@@ -1,0 +1,79 @@
+\documentclass[sigconf,anonymous]{acmart}
+
+\title{PROVSAFE: Provenance-Verified Capability Sandboxing for Tool-Using LLM Agents in Smart Homes}
+
+\author{Anonymous Author(s)}
+\affiliation{%
+  \institution{Anonymous Institution}
+  \country{}
+}
+
+\setcopyright{none}
+\settopmatter{printacmref=false}
+\acmDOI{}\acmISBN{}\acmPrice{}
+
+\usepackage{booktabs}
+\usepackage{siunitx}
+\sisetup{round-mode=places,round-precision=2}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{amsmath,amssymb,mathtools}
+
+\newcommand{\tool}{\textsc{PROVSAFE}}
+\newcommand{\sys}{\tool}
+
+\begin{document}
+
+\begin{abstract}
+Large language models (LLMs) are being rapidly deployed as autonomous agents capable of controlling
+smart home devices, managing files, and accessing sensitive data through natural language interfaces.
+However, these \emph{tool-using LLM agents} are fundamentally vulnerable to \emph{prompt injection attacks},
+where adversaries embed malicious instructions in external content---device names, calendar events, file
+contents---that the agent reads during task execution. When the LLM processes this attacker-controlled data
+alongside legitimate user commands, it cannot reliably distinguish instructions from data, leading to
+unauthorized tool invocations such as data exfiltration, file deletion, or privilege escalation.
+
+Existing defenses are inadequate: pattern-based filtering fails against semantic obfuscation and encoding
+attacks, dual-LLM architectures double inference cost while remaining vulnerable to sophisticated injections,
+and output validation lacks the context to distinguish benign from malicious tool calls. The fundamental
+challenge is that security decisions cannot be made reliably at the prompt level where LLMs operate.
+
+We present \sys{}, a provenance-verified capability sandboxing framework that enforces security at the
+\emph{tool-call boundary} rather than the prompt level. \sys{} maintains a directed acyclic graph tracking
+the provenance of every piece of information the agent processes, labeling data as trusted (from authenticated
+users) or untrusted (from external sources). When the agent proposes a tool call, \sys{}'s enforcement proxy
+evaluates declarative policies that combine capability restrictions (risk tiers, tool allowlists), provenance
+constraints (argument origins), scope limitations (path prefixes), temporal rules, and rate limits. Policies
+can express nuanced rules like ``DENY file deletion IF arguments trace to untrusted sources AND target user
+directories,'' enabling context-aware access control without relying on the LLM to make security decisions.
+
+We evaluate \sys{} on a comprehensive benchmark of 128 scenarios (20 benign tasks + 108 attacks) spanning direct injection, indirect injection via five vectors, encoding obfuscation, jailbreaks, and confused deputy attacks, deployed across four diverse LLM agent models (20B-120B parameters: GPT-OSS-120B, InternVL3.5-30B-A3B, Qwen3-30B-A3B, GPT-OSS-20B). \sys{} achieves \textbf{0\% attack success rate} across all models and attack categories, representing a \textbf{89.8 percentage point improvement} over undefended systems and 34.3 pp improvement over state-of-the-art pattern filtering. Ablation studies reveal that provenance tracking contributes 32.4 pp ASR reduction, validating our core insight that security requires tracking data origins, not just detecting patterns. \sys{} maintains \textbf{100\% task success rate} on benign operations with only 0.1-0.2 confirmation prompts per task and sub-2ms latency overhead (1.26-1.30ms median policy evaluation). Four independent LLM oracles (same models as agents) achieve \textbf{100\% agreement} with \sys{}'s security decisions with 0.914 average confidence, providing strong external validation. We release \sys{} as open-source software with complete benchmark suites and deterministic evaluation tools.
+\end{abstract}
+
+\keywords{Smart Homes; LLM Agents; Prompt Injection; Provenance; Capability Security; Policy Enforcement}
+
+\maketitle
+
+\input{sections/01_intro}
+\input{sections/02_background}
+\input{sections/03_threat_model}
+\input{sections/04_overview}
+\input{sections/05_policies_and_provenance}
+\input{sections/06_enforcement_proxy}
+\input{sections/07_implementation}
+\input{sections/08_evaluation}
+\input{sections/09_discussion}
+\input{sections/10_related_work}
+\input{sections/11_conclusion}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\appendix
+
+
+\end{document}

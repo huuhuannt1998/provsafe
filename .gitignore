@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+
+# Results (keep structure but not data files)
+evaluation/results/**/*.json
+evaluation/results/**/*.csv
+!evaluation/results/.gitkeep
+
+# Environment
+.env
+.vscode/
+.idea/
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# macOS
+.DS_Store

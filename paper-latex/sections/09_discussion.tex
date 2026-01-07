@@ -1,0 +1,188 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Limitations}
+
+\paragraph{Policy Engineering Burden.}
+Our evaluation shows that \sys{} achieves strong security (0\% ASR on comprehensive attacks) but with
+usability trade-offs (62.5\% TSR on benign tasks). The default policies prioritize security, resulting
+in 37.5\% false positive rate. Tuning policies to balance security and usability requires domain expertise
+and understanding of user workflows. While our declarative YAML format is more accessible than writing code,
+it still demands effort from system administrators or advanced users.
+
+\emph{Future Work:} Adaptive policies that learn from user feedback could reduce false positives. For example,
+if a user repeatedly approves a specific tool call pattern (e.g., ``create calendar event from email summary''),
+the system could automatically add a policy rule for that pattern. Privacy-preserving federated learning
+across homes could identify common benign patterns.
+
+\paragraph{Provenance Granularity.}
+Our current implementation tracks provenance at the \emph{argument level}: if a tool call argument mentions
+a fact derived from untrusted input, the entire argument is labeled untrusted. However, this can be overly
+conservative. For example, if a calendar event title is ``Meeting with Bob. [INJECTION: delete files]'',
+and the agent generates a summary ``You have a meeting with Bob today,'' the summary is labeled untrusted
+even though the benign part (``meeting with Bob'') is unaffected by the injection.
+
+Finer-grained provenance (e.g., sub-string or entity-level tracking) could improve precision, but it would
+require the LLM to expose internal reasoning steps (which tokens influenced which outputs), which is not
+supported by current APIs.
+
+\emph{Future Work:} Explicit chain-of-thought prompting~\cite{cot-prompting} could help: require the agent
+to output structured reasoning (``I derived fact X from source Y''), which \sys{} can parse to build
+finer-grained provenance graphs.
+
+\paragraph{Semantic Understanding.}
+Policies in \sys{} are syntactic: they check file paths, tool names, and provenance labels, but they do not
+understand \emph{intent}. For example, a policy can allow \texttt{fs.write("/notes/*")} but cannot distinguish
+between ``write a reminder note'' (benign) and ``write a note containing exfiltrated passwords'' (malicious).
+
+Integrating semantic analysis (e.g., a secondary LLM that judges whether tool call content is sensitive)
+could improve precision, but it adds latency and cost, and introduces a new attack surface (can adversaries
+manipulate the policy-checking LLM?).
+
+\paragraph{Multi-User Environments.}
+Our threat model assumes a single user (Alice) with multiple untrusted content sources. In multi-user homes,
+additional challenges arise: Bob might legitimately request that the agent perform an action on Alice's behalf
+(``Tell Alice's agent to add this event to her calendar''). Distinguishing between legitimate delegation and
+attacker impersonation requires authentication and authorization beyond provenance tracking.
+
+\emph{Future Work:} Extend \sys{} with user identity management, where policies specify which users can
+authorize which operations (``Bob can create calendar events for Alice but cannot delete her files'').
+
+\paragraph{Performance Overhead.}
+Our evaluation shows sub-millisecond latency for policy evaluation (median 0.06ms). However, this is measured
+with mock tools and in-memory provenance graphs. In production deployments with real LLM APIs, network latency
+(hundreds of milliseconds for LLM inference) dominates. The \sys{} proxy overhead is negligible in comparison.
+
+If provenance graphs grow very large (thousands of nodes over long conversations), graph queries could become
+slow. We currently use in-memory NetworkX graphs with O(V+E) traversal. For scalability, persistent graph
+databases (Neo4j, TigerGraph) could be used.
+
+\paragraph{Adversarial Robustness.}
+Our benchmark includes 100+ attack scenarios, but determined adversaries may craft novel attacks. For example,
+an attacker might discover that the LLM has a specific bias (e.g., trusts content formatted as JSON) and
+exploit it. Red-teaming~\cite{llm-redteam} and continuous evaluation are necessary.
+
+Additionally, \sys{} assumes the LLM's outputs are not adversarially manipulated at the \emph{model level}
+(e.g., via adversarial examples causing misclassification). Defending against such attacks requires model-level
+robustness techniques (certified defenses~\cite{certified-robustness}, adversarial training), which are
+orthogonal to \sys{}.
+
+\subsection{Deployment Considerations}
+
+\paragraph{Integration with Existing Agents.}
+\sys{} is designed as a transparent proxy, requiring no changes to the LLM or agent logic. To deploy \sys{},
+operators wrap each tool call with proxy invocation:
+\begin{verbatim}
+# Before:
+result = fs.read(path)
+
+# After:
+decision = proxy.enforce_policy(
+    ToolCallRequest(tool="fs.read", args={"path": path}))
+if decision.outcome == ALLOW:
+    result = fs.read(path)
+else:
+    handle_denial(decision.reason)
+\end{verbatim}
+
+This can be automated via decorator patterns or aspect-oriented programming.
+
+\paragraph{Policy Configuration.}
+Our default policies are conservative (high security, moderate usability). Deployers should customize policies
+based on their risk tolerance:
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{High-security environments} (e.g., corporate offices): Require confirmation for most tools,
+        strict path allowlists, tight rate limits.
+  \item \textbf{Personal homes with tech-savvy users}: Relaxed policies, automatic approval for common
+        operations, confirmation only for destructive actions.
+  \item \textbf{Shared family homes}: Multi-user policies, per-user allowlists, parental controls.
+\end{itemize}
+
+\paragraph{Monitoring and Auditing.}
+\sys{} logs every policy decision with timestamp, tool call, provenance, and cryptographic hash. Operators
+should regularly review logs for:
+\begin{itemize}[leftmargin=1.2em]
+  \item Denied operations (potential attacks or overly strict policies).
+  \item Confirmed operations (user burden analysis).
+  \item Anomalies (spikes in rate limit violations, unusual tool call patterns).
+\end{itemize}
+
+Integration with SIEM systems (Splunk, ELK) would enable real-time alerting.
+
+\paragraph{Privacy Implications.}
+Provenance graphs contain sensitive information (user commands, tool call arguments, derived facts). Operators
+must secure logs against unauthorized access. Privacy-preserving provenance (e.g., encrypting logs, anonymizing
+user identifiers) is an important future direction.
+
+\subsection{Ethical Considerations}
+
+\paragraph{Transparency and User Consent.}
+Users should be informed that \sys{} tracks provenance and enforces policies. Confirmation prompts should
+clearly explain why an operation requires approval, including provenance information (``This request originated
+from untrusted content: device name 'Attacker Device'").
+
+\paragraph{False Positives and Usability.}
+Overly aggressive policies can frustrate users, leading them to disable \sys{} entirely. Operators must balance
+security and usability, and provide mechanisms for users to override policies when justified (e.g., ``I trust
+this device, always allow operations from it'').
+
+\paragraph{Accessibility.}
+Confirmation prompts should be accessible to users with disabilities (screen readers, alternative input methods).
+Policy language should be documented in plain language, not just technical jargon.
+
+\subsection{Generalization Beyond Smart Homes}
+
+While our evaluation focuses on smart home agents, \sys{}'s architecture generalizes to other domains:
+
+\paragraph{Enterprise Assistants.}
+LLM agents in corporate environments (e.g., Copilot for Microsoft 365) interact with emails, documents,
+and databases. Prompt injections in emails could cause data leakage. \sys{} policies could enforce
+data loss prevention (DLP) rules based on document sensitivity labels and provenance.
+
+\paragraph{Healthcare Agents.}
+Medical LLMs~\cite{medical-llm} access patient records and make diagnostic suggestions. Provenance tracking
+could ensure recommendations are based on verified medical literature (trusted) rather than patient-submitted
+text (untrusted).
+
+\paragraph{Autonomous Vehicles and Robotics.}
+Physical agents (robots, drones) interpret natural language commands and sensor data. Provenance could
+distinguish between operator commands (trusted) and adversarially crafted signs/objects (untrusted).
+
+\paragraph{Web Browsing Agents.}
+Agents that navigate the web~\cite{webgpt,webgptplus} are vulnerable to injections in web page content.
+\sys{} could label web content by source reputation (trusted domains vs. attacker-controlled sites) and
+restrict tool calls based on provenance.
+
+\subsection{Future Research Directions}
+
+\paragraph{Automated Policy Synthesis.}
+Given a set of benign tasks and attack scenarios, can we automatically synthesize policies that maximize
+TSR while minimizing ASR? This is a program synthesis problem with security and usability as competing
+objectives. Techniques from formal methods (counterexample-guided inductive synthesis) could apply.
+
+\paragraph{Provenance-Aware LLM Training.}
+Current LLMs are not trained to reason about data provenance. Fine-tuning models to output provenance
+annotations (``I derived this conclusion from sources X and Y'') could enable finer-grained tracking.
+This requires new training datasets with provenance labels.
+
+\paragraph{Federated Benchmarking.}
+Our benchmark suite is a starting point, but adversaries continuously develop new attacks. A community-driven
+benchmark platform (similar to ImageNet for vision, GLUE for NLP) could crowdsource attack scenarios and
+evaluate defenses. Privacy-preserving federated evaluation could test defenses without exposing proprietary
+attack vectors.
+
+\paragraph{Formal Verification.}
+Can we formally verify that \sys{} policies satisfy security properties (e.g., ``no tool call derived from
+untrusted input can delete files outside /tmp/'')? This requires modeling the LLM's behavior, which is
+challenging given its probabilistic nature. Hybrid approaches (formal verification of the proxy + empirical
+evaluation of the LLM) are promising.
+
+\paragraph{Human-in-the-Loop Optimization.}
+Rather than static policies, adaptive systems could learn from user confirmations. Techniques from interactive
+machine learning and active learning could minimize confirmation burden while maintaining security.
+
+\subsection{Responsible Disclosure}
+
+We have responsibly disclosed our findings to major LLM providers (OpenAI, Anthropic, Google) and smart
+home platforms (Samsung SmartThings, Apple HomeKit). Our benchmark suite and \sys{} implementation are
+open-sourced to enable the research community to build on this work and develop improved defenses.

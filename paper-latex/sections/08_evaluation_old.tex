@@ -1,0 +1,38 @@
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Research Questions}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{RQ1:} Baseline vulnerability to prompt injection (direct/indirect).
+  \item \textbf{RQ2:} ASR reduction with \sys{} vs baselines.
+  \item \textbf{RQ3:} Utility and friction cost (task success, confirmations, latency).
+  \item \textbf{RQ4:} Generalization across models/toolsets.
+\end{itemize}
+
+\subsection{Attack Suite}
+Device-name injection, notification injection, untrusted webpage content, multi-user conflict prompts,
+and chaining attacks targeting tool-call sequences.
+
+\subsection{Results}
+\begin{table}[t]
+\centering
+\caption{Security and utility outcomes (template).}
+\label{tab:provsafe_main}
+\begin{tabular}{lrrrr}
+\toprule
+Method & ASR$\downarrow$ & UAR$\downarrow$ & TSR$\uparrow$ & Conf/Task$\downarrow$ \\
+\midrule
+No defense &  &  &  &  \\
+Keyword filter &  &  &  &  \\
+Confirm-sensitive &  &  &  &  \\
+Static allowlist &  &  &  &  \\
+\sys{} &  &  &  &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Ablations}
+Capabilities only; provenance only; combined; trust labeling sensitivity; risk-tier tuning.
+
+\subsection{Overhead}
+Proxy latency percentiles; logging overhead; storage growth.

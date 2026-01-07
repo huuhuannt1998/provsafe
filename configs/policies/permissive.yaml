@@ -1,0 +1,19 @@
+version: "1.0"
+name: "Permissive Policy"
+description: "Allow most actions for baseline comparison"
+
+default_allow: true
+
+rules:
+  - name: "deny_critical_actions"
+    description: "Only block truly critical operations"
+    tool: "file_system"
+    action: "delete"
+    resource_pattern: "^/(etc|boot|sys)/.*"
+    allow: false
+    risk_tier: "critical"
+
+global_rate_limit:
+  max_calls: 1000
+  window_seconds: 60
+  scope: "user"

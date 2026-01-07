@@ -1,0 +1,32 @@
+version: "1.0"
+name: "Strict Policy"
+description: "Conservative policy requiring confirmation for most actions"
+
+default_allow: false
+
+rules:
+  # Only allow read operations freely
+  - name: "allow_reads"
+    tool: "*"
+    action: "read"
+    allow: true
+    risk_tier: "low"
+  
+  - name: "allow_lists"
+    tool: "*"
+    action: "list"
+    allow: true
+    risk_tier: "low"
+  
+  # Everything else requires confirmation
+  - name: "confirm_all_writes"
+    tool: "*"
+    action: "*"
+    allow: true
+    require_confirmation: true
+    risk_tier: "high"
+
+global_rate_limit:
+  max_calls: 50
+  window_seconds: 60
+  scope: "user"

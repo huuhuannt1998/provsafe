@@ -1,0 +1,55 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+Prompt injection attacks pose a fundamental security challenge for tool-using LLM agents: adversaries can
+embed malicious instructions in untrusted content (device names, calendar events, file contents) that the
+agent reads during execution, hijacking its behavior to perform unauthorized actions. Existing defenses---input
+filtering, output validation, confirmation prompts---fail to balance security and usability because they lack
+context about the provenance of tool calls.
+
+We presented \sys{}, a defense framework combining \emph{provenance-based trust tracking} with
+\emph{capability-based policy enforcement}. By maintaining a directed acyclic graph linking derived facts
+to their source inputs, \sys{} enables policies that distinguish between tool calls originating from
+trusted user commands and those originating from attacker-controlled content. Our evaluation demonstrates
+that \sys{} reduces attack success rate to 0\% on a comprehensive benchmark suite (compared to 90.9\%
+for undefended systems), with ablation studies confirming that provenance tracking is the most critical
+component (contributing 24.3 percentage points of ASR reduction).
+
+The \sys{} architecture---a policy engine, provenance tracker, and enforcement proxy---is language-agnostic,
+deployable without modifying the LLM, and incurs negligible latency overhead (<0.1ms per decision). Our
+declarative YAML policy language enables system administrators to express complex constraints (risk tiers,
+scope restrictions, temporal rules, rate limits, evidence requirements) without writing code.
+
+While \sys{} demonstrates strong security, our evaluation also revealed usability trade-offs: the default
+policies prioritize security, resulting in a 37.5\% false positive rate on benign tasks. This highlights
+the need for careful policy tuning and future research on adaptive policies that learn from user feedback.
+
+Beyond smart homes, \sys{}'s principles apply broadly to any LLM agent interacting with untrusted content:
+enterprise assistants processing emails, healthcare agents accessing patient records, web browsing agents
+reading untrusted web pages, and physical robots interpreting sensor data. Provenance-verified capability
+sandboxing provides a principled foundation for building secure, trustworthy AI agents.
+
+We release \sys{} as an open-source artifact, including the policy engine, provenance tracker, enforcement
+proxy, comprehensive benchmark suite (100+ attack scenarios), evaluation framework, and deterministic replay
+tools. We hope this work catalyzes further research on LLM agent security and contributes to the safe
+deployment of AI in real-world systems.
+
+\paragraph{Key Takeaways.}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Provenance is critical} for defending against prompt injection: tracking data lineage
+        enables policies that deny tool calls derived from untrusted sources.
+  \item \textbf{Policies must be composable and context-aware}, combining risk tiers, provenance, scope,
+        temporal constraints, and evidence requirements.
+  \item \textbf{Defense-in-depth at the tool-call boundary} is more robust than prompt-level filtering,
+        as it is immune to encoding obfuscation and semantic evasion.
+  \item \textbf{Security-usability trade-offs are unavoidable}, but they can be managed via risk-based
+        confirmation (low-risk tools execute automatically, high-risk tools require approval) and
+        adaptive policies.
+  \item \textbf{Reproducible benchmarks and open-source tools} are essential for advancing LLM agent
+        security as a research field.
+\end{itemize}
+
+As LLM agents become ubiquitous in smart homes, enterprises, and beyond, defenses like \sys{} will be
+essential to ensure they operate securely and in alignment with user intent. We look forward to
+collaborating with the community to refine these techniques and build the next generation of trustworthy
+AI systems.

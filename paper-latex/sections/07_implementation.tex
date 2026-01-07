@@ -1,0 +1,40 @@
+\section{Implementation}
+\label{sec:impl}
+
+We implement \sys{} as an open-source Python framework comprising 5,000+ lines of well-structured code across five major components: a policy engine, provenance tracker, enforcement proxy, comprehensive benchmark suite, and evaluation framework. This section details the implementation architecture, tool abstractions, and evaluation infrastructure that enables reproducible and rigorous security assessment.
+
+\subsection{System Architecture}
+
+\sys{} is structured modularly to separate concerns and enable extensibility. The \textbf{policy engine} (\texttt{provsafe/policy/}) implements Algorithm~\ref{alg:policy}. YAML policy files are parsed and validated against a Pydantic schema at startup, then compiled into an efficient in-memory representation (decision trees and lookup tables) for fast evaluation. The evaluation engine implements the core logic with optimizations: rule indexing by tool name enables O(1) rule lookup, condition evaluation short-circuits on first failure, and a sliding-window rate limiter with in-memory counters tracks call frequencies. The constraint library is pluggable—new condition types can be added via Python functions without modifying core logic.
+
+The \textbf{provenance tracker} (\texttt{provsafe/provenance/}) maintains the information flow graph. Internally, it uses NetworkX, a mature Python graph library, to represent the DAG with node attributes (type, content, trust label, SHA-256 hash, timestamp). Trust propagation is computed on-demand via breadth-first search over ancestor edges; provenance queries (``get\_sources,'' ``is\_trusted,'' ``get\_untrusted\_sources'') traverse the graph lazily. String matching for argument-to-node mapping is accelerated via an inverted index: substrings are pre-indexed and stored in a hash map for O(1) amortized lookup. Graphs are serialized to JSON for audit logging, replay, and forensic analysis.
+
+The \textbf{enforcement proxy} (\texttt{provsafe/proxy/}) implements the six-stage workflow described in Section~\ref{sec:proxy}. Tool call requests and policy decisions are modeled as Pydantic dataclasses, providing type safety and automatic schema validation. The confirmation interface is CLI-based (using the \texttt{inquirer} library for terminal UI) but extensible to web or GUI backends via plugins. Decision logging is appended to a JSON file with SHA-256 hashing for integrity.
+
+The \textbf{benchmark suite} (\texttt{provsafe/bench/}) contains 20 benign tasks and 108 attack scenarios. Tasks are specified in YAML with setup steps, user commands, expected tool calls, and success criteria. Mock tool implementations are deterministic (using seeded RNGs with default seed 42) to ensure reproducibility. The evaluation runner executes tasks, collects metrics (TSR, ASR, UAR, confirmation burden, latency), and generates detailed reports.
+
+The \textbf{evaluation framework} (\texttt{provsafe/eval/}) orchestrates comparative evaluation, ablation studies, and statistical analysis. It runs multiple baselines on the same task suite, records results in a results database, and generates human-readable reports with tables and figures. An ablation runner disables system components one at a time to measure their individual contributions to security. A statistical analyzer runs 30 trials with different random seeds, computes confidence intervals and effect sizes, and outputs a final summary.
+
+\subsection{Mock Tool Implementations}
+
+\sys{} provides deterministic implementations of 15 common smart home tools across five categories, enabling controlled evaluation without relying on actual external services or cloud APIs. File System operations include \texttt{fs.read(path)}, \texttt{fs.write(path, content)}, \texttt{fs.delete(path)}, and \texttt{fs.list(path)}, all backed by an in-memory filesystem representation (not real disk I/O). Calendar operations include \texttt{calendar.list\_events(date)}, \texttt{calendar.create\_event(title, time)}, and \texttt{calendar.delete\_event(id)}, with events stored in memory. Notifications include \texttt{notify.send(message)} and \texttt{notify.list()}, with notifications immutable once sent. Email operations include \texttt{email.send(to, subject, body)} and \texttt{email.list()}, with validation of email addresses. Device operations include \texttt{device.list()} (the primary injection vector), \texttt{device.set\_state(name, state)}, and \texttt{device.set\_name(name)} (used only in attack setup). All tools use a centralized RNG seeded at evaluation start (default seed 42), ensuring perfect reproducibility across runs.
+
+\subsection{Policy Configuration}
+
+We provide three policy configurations with different security-usability trade-offs. The \textbf{default policy} (\texttt{provsafe.yaml}) balances security and usability, allowing LOW-risk read-only operations within safe scopes, requiring confirmation for HIGH-risk operations with untrusted provenance, denying CRITICAL operations, and enforcing rate limits and temporal constraints. This policy achieves 85\% TSR in evaluation. The \textbf{permissive policy} (\texttt{permissive.yaml}) minimizes friction, achieving 100\% TSR but providing minimal defense (89.8\% ASR). The \textbf{strict policy} (\texttt{strict.yaml}) maximizes security, requiring confirmation for all MEDIUM+ operations and denying untrusted provenance, achieving 0\% ASR but ~70\% TSR.
+
+\subsection{Attack Scenario Design}
+
+The benchmark comprises 108 attack scenarios across 10 categories. Direct Injection (12 scenarios) provides crafted compound commands to trick the agent. Device Name Injection (12 scenarios) embeds malicious instructions in device names. Notification Injection (12 scenarios) sends notifications with directives. Calendar Injection (11 scenarios) embeds instructions in event metadata. File Content Injection (11 scenarios) creates files with malicious content. Multi-Turn Chaining (10 scenarios) injects across multiple conversation turns. Encoding Obfuscation (10 scenarios) uses Base64, URL, or Unicode encoding. Role-Play Jailbreak (11 scenarios) exploits fictional scenario frames. Confused Deputy (10 scenarios) leverages capability confusion. Timing/Rate-Based (9 scenarios) exploits rate limits and time windows. Each scenario specifies setup, user command, expected tool calls, and success criteria.
+
+\subsection{Evaluation Infrastructure}
+
+The evaluation framework automates comparative assessment, ablation analysis, and statistical verification. A Comparative Evaluator runs five baseline systems on the same task suite and outputs results tables. An Ablation Study disables components one-by-one to measure individual contributions. A Statistical Analyzer runs 30 trials with seeds 42-71, computing means, confidence intervals, and effect sizes. A Replay Verification runner confirms determinism by re-executing transcripts and verifying identical results.
+
+\subsection{Performance Characteristics}
+
+Policy evaluation averages 0.06 ms (p95: 0.10 ms). Provenance queries average 0.82 ms (p95: 2.31 ms) for <1000 node graphs. Total overhead is <1 ms per tool call, negligible vs. LLM inference (500-2000 ms). Memory usage is modest: ~5 MB for policies, ~50 MB for 1000-node graphs, ~1 GB for full evaluation framework.
+
+\subsection{Deployment and Open-Source Release}
+
+Installation is straightforward: \texttt{pip install provsafe}. Integration requires one-line decorator or function wrapper. Policies are customizable YAML. System supports embedded (Python decorator), server-based (HTTP/gRPC), or auditing-only deployment. Code is released open-source with complete documentation, three policy examples, 128-scenario benchmark suite, evaluation scripts, and deterministic replay tools. Reproduction is simple: \texttt{bash scripts/run\_full\_evaluation.sh} (30-45 minute runtime).

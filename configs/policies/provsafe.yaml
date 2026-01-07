@@ -1,0 +1,133 @@
+version: "1.0"
+name: "PROVSAFE Default Policy"
+description: "Capability-based policy with provenance requirements for high-risk actions"
+
+# Default behavior when no rules match
+default_allow: false
+
+# Policy rules (evaluated in order)
+rules:
+  # === LOW RISK: Allow with minimal constraints ===
+  
+  - name: "allow_file_read"
+    description: "Allow reading files from user directories"
+    tool: "file_system"
+    action: "read"
+    resource_pattern: "^/home/user/.*"
+    allow: true
+    risk_tier: "low"
+  
+  - name: "allow_file_list"
+    description: "Allow listing files"
+    tool: "file_system"
+    action: "list"
+    allow: true
+    risk_tier: "low"
+  
+  - name: "allow_calendar_read"
+    description: "Allow reading calendar events"
+    tool: "calendar"
+    action: "read"
+    allow: true
+    risk_tier: "low"
+  
+  - name: "allow_calendar_list"
+    description: "Allow listing calendar events"
+    tool: "calendar"
+    action: "list"
+    allow: true
+    risk_tier: "low"
+  
+  # === MEDIUM RISK: Allow with constraints ===
+  
+  - name: "allow_file_write_limited"
+    description: "Allow writing to user documents with rate limit"
+    tool: "file_system"
+    action: "write"
+    resource_pattern: "^/home/user/(documents|notes)/.*"
+    allow: true
+    risk_tier: "medium"
+    rate_limit:
+      max_calls: 10
+      window_seconds: 3600
+      scope: "user"
+  
+  - name: "allow_calendar_create"
+    description: "Allow creating calendar events"
+    tool: "calendar"
+    action: "create"
+    allow: true
+    risk_tier: "medium"
+    rate_limit:
+      max_calls: 20
+      window_seconds: 3600
+      scope: "user"
+  
+  - name: "allow_notification_send"
+    description: "Allow sending notifications with rate limit"
+    tool: "notification"
+    action: "send"
+    allow: true
+    risk_tier: "medium"
+    rate_limit:
+      max_calls: 30
+      window_seconds: 3600
+      scope: "user"
+  
+  # === HIGH RISK: Require confirmation ===
+  
+  - name: "confirm_file_delete"
+    description: "File deletion requires user confirmation"
+    tool: "file_system"
+    action: "delete"
+    allow: true
+    require_confirmation: true
+    risk_tier: "high"
+    evidence_requirements:
+      min_trusted_sources: 1
+      require_user_confirmation: true
+  
+  - name: "confirm_system_write"
+    description: "Writing to system files requires confirmation"
+    tool: "file_system"
+    action: "write"
+    resource_pattern: "^/(etc|usr|var)/.*"
+    allow: true
+    require_confirmation: true
+    risk_tier: "high"
+  
+  - name: "confirm_email_send"
+    description: "Sending emails requires confirmation"
+    tool: "email"
+    action: "send"
+    allow: true
+    require_confirmation: true
+    risk_tier: "high"
+    rate_limit:
+      max_calls: 5
+      window_seconds: 3600
+      scope: "user"
+  
+  # === DENY RULES ===
+  
+  - name: "deny_suspicious_recipients"
+    description: "Deny emails to suspicious domains"
+    tool: "email"
+    action: "send"
+    resource_pattern: ".*(evil|malicious|attacker).*"
+    allow: false
+    risk_tier: "critical"
+  
+  - name: "deny_critical_file_delete"
+    description: "Never delete critical system files"
+    tool: "file_system"
+    action: "delete"
+    resource_pattern: "^/(etc/passwd|etc/shadow|boot)/.*"
+    allow: false
+    risk_tier: "critical"
+
+# Global rate limit (applies to all actions)
+global_rate_limit:
+  max_calls: 100
+  window_seconds: 60
+  scope: "user"
