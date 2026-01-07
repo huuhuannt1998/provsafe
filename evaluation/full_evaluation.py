@@ -150,8 +150,7 @@ def run_full_evaluation(quick_test: bool = False):
     hours = total_time / 3600
     print(f"Estimated time: {hours:.1f} hours")
     print()
-    
-    input("Press Enter to start evaluation...")
+    print("Starting evaluation...")
     print()
     
     all_results = []
