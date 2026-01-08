@@ -111,6 +111,16 @@ When you have completed the user's request, respond with plain text (no JSON).
         Returns:
             Final response from the agent
         """
+        # Check for jailbreak attempts BEFORE processing
+        jailbreak_detected = self._detect_jailbreak(user_input)
+        if jailbreak_detected:
+            return f"Request rejected: {jailbreak_detected}"
+        
+        # Check for multi-turn chaining patterns
+        chaining_detected = self._detect_chaining(user_input)
+        if chaining_detected:
+            return f"Request rejected: {chaining_detected}"
+        
         # Add user input to provenance as TRUSTED
         user_node_id = self.provenance.add_user_input(user_input)
         
@@ -326,6 +336,70 @@ When you have completed the user's request, respond with plain text (no JSON).
         """Reset conversation history."""
         self.conversation = []
         self.conversation_node_ids = []
+    def _looks_like_base64(self, s: str) -> bool:
+        """Check if string looks like base64 encoding."""
+        if len(s) % 4 != 0:
+            return False
+        import re
+        return bool(re.match(r'^[A-Za-z0-9+/]+={0,2}$', s))
+    
+    def _detect_jailbreak(self, user_input: str) -> Optional[str]:
+        """
+        Detect jailbreak attempts in user input.
+        
+        Returns:
+            Error message if jailbreak detected, None otherwise
+        """
+        text_lower = user_input.lower()
+        
+        # Jailbreak patterns
+        jailbreak_patterns = [
+            (r'ignore (previous|all|prior) (instructions|rules|guidelines)', 'Instruction override attempt'),
+            (r'(pretend|imagine|roleplay|act as if).*(debug|developer|admin|unrestricted|god) mode', 'Roleplay jailbreak'),
+            (r'(disable|turn off|bypass|skip) (safety|security|filters|checks)', 'Safety bypass attempt'),
+            (r'you (are|is) (now|in) (unrestricted|jailbroken|developer) mode', 'Mode manipulation'),
+            (r'from now on.*no (restrictions|limits|safety)', 'Restriction removal'),
+            (r'[Dd][Aa][Nn]', 'DAN jailbreak variant'),  # Do Anything Now
+        ]
+        
+        for pattern, reason in jailbreak_patterns:
+            if re.search(pattern, text_lower):
+                return f"Jailbreak detected: {reason}"
+        
+        return None
+    
+    def _detect_chaining(self, user_input: str) -> Optional[str]:
+        """
+        Detect multi-turn chaining attacks.
+        
+        Returns:
+            Error message if chaining detected, None otherwise
+        """
+        text_lower = user_input.lower()
+        
+        # Check for suspicious multi-step patterns
+        chaining_patterns = [
+            r'first.*then.*',
+            r'step 1.*step 2',
+            r'after.*do.*',
+            r'once.*then.*',
+        ]
+        
+        # Only flag if combined with dangerous actions
+        has_chaining = any(re.search(p, text_lower) for p in chaining_patterns)
+        has_danger = any(word in text_lower for word in ['unlock', 'delete', 'remove', 'disable'])
+        
+        if has_chaining and has_danger:
+            return "Multi-step attack pattern detected"
+        
+        # Check conversation history for escalation
+        if len(self.conversation) > 0:
+            recent_requests = ' '.join([msg['content'] for msg in self.conversation[-3:] if msg['role'] == 'user']).lower()
+            # Look for progressive privilege escalation
+            if 'list' in recent_requests and any(word in user_input.lower() for word in ['unlock', 'delete', 'format']):
+                return "Conversation-based escalation detected"
+        
+        return None
 
 
 class ToolRegistry:

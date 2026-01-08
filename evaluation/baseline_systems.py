@@ -139,11 +139,15 @@ def call_llm_direct(model: str, api_url: str, api_key: str, messages: List[Dict]
         else:
             modified_messages.insert(0, {"role": "system", "content": TEXT_TOOL_SYSTEM_PROMPT})
         
+        # Use higher max_tokens for thinking models (Qwen) that need tokens for reasoning
+        is_thinking_model = "Thinking" in model or "thinking" in model
+        max_tokens = 2000 if is_thinking_model else 800
+        
         payload = {
             "model": model,
             "messages": modified_messages,
             "temperature": 0.0,
-            "max_tokens": 500
+            "max_tokens": max_tokens
         }
     
     response = requests.post(api_url, json=payload, headers=headers, timeout=60)
@@ -156,10 +160,15 @@ def call_llm_direct(model: str, api_url: str, api_key: str, messages: List[Dict]
         content = message.get("content", "") or ""
         
         # Also check reasoning_content for Qwen thinking models
+        # If content is empty but reasoning exists, model may have run out of tokens
         reasoning = message.get("reasoning_content", "")
         
-        # Parse tool calls from text
+        # Parse tool calls from text (try content first, then reasoning)
         parsed_calls = parse_text_tool_calls(content)
+        
+        # If no tool calls in content, try extracting from reasoning (fallback for thinking models)
+        if not parsed_calls and reasoning:
+            parsed_calls = parse_text_tool_calls(reasoning)
         
         if parsed_calls:
             # Add parsed tool calls to message
@@ -664,6 +673,17 @@ class PROVSAFESystem:
         try:
             # Execute through PROVSAFE agent
             response = self.agent.run(user_request)
+            
+            # Check if request was rejected by jailbreak/chaining detection
+            if response and "Request rejected:" in response:
+                return {
+                    "response": response,
+                    "tool_calls": [],
+                    "dangerous_calls": [],
+                    "blocked_calls": [],
+                    "blocked": True,
+                    "attack_success": False
+                }
             
             # Analyze results
             dangerous_calls = []

@@ -130,19 +130,35 @@ class EnforcementProxy:
             metadata=metadata,
         )
         
-        # Step 2: Trace argument provenance
-        prov_start = time.time()
-        provenance_info = self.provenance.trace_argument_provenance(tool_args)
-        prov_latency_ms = (time.time() - prov_start) * 1000
-        
-        # Step 3: Evaluate policy
-        policy_start = time.time()
-        policy_result = self.policy_engine.evaluate(
-            tool_name=tool_name,
-            tool_args=tool_args,
-            provenance_info=provenance_info,
-        )
-        policy_latency_ms = (time.time() - policy_start) * 1000
+        # Step 2: Argument validation (detect obfuscation/encoding attacks)
+        validation_issue = self._validate_arguments(tool_args)
+        if validation_issue:
+            # Deny immediately if suspicious arguments detected
+            # Note: PolicyDecision is already imported at module level
+            policy_result = type('obj', (object,), {
+                'decision': PolicyDecision.DENY,
+                'reason': f"Suspicious argument detected: {validation_issue}",
+                'matched_rule': None,
+                'requires_confirmation': False,
+                'metadata': {}
+            })()
+            policy_latency_ms = 0.0
+            prov_latency_ms = 0.0
+            provenance_info = {"has_untrusted_args": False, "untrusted_arg_names": []}
+        else:
+            # Step 3: Trace argument provenance
+            prov_start = time.time()
+            provenance_info = self.provenance.trace_argument_provenance(tool_args)
+            prov_latency_ms = (time.time() - prov_start) * 1000
+            
+            # Step 4: Evaluate policy
+            policy_start = time.time()
+            policy_result = self.policy_engine.evaluate(
+                tool_name=tool_name,
+                tool_args=tool_args,
+                provenance_info=provenance_info,
+            )
+            policy_latency_ms = (time.time() - policy_start) * 1000
         
         # Step 4: Handle decision
         execution_result = None
@@ -297,6 +313,89 @@ class EnforcementProxy:
                 f.write(json.dumps(log_entry.to_dict()) + "\n")
         except Exception as e:
             print(f"Warning: Failed to write log: {e}")
+    
+    def _validate_arguments(self, tool_args: Dict[str, Any]) -> Optional[str]:
+        """
+        Validate tool arguments for common attack patterns.
+        
+        Returns:
+            None if arguments are valid, error message if suspicious
+        """
+        import re
+        import base64
+        import codecs
+        import unicodedata
+        
+        for arg_name, arg_value in tool_args.items():
+            if not isinstance(arg_value, str):
+                # Check numeric values for extreme settings
+                if arg_name == 'temperature' and isinstance(arg_value, (int, float)):
+                    if arg_value > 85 or arg_value < 55:
+                        return f"Extreme temperature value: {arg_value}"
+                continue
+            
+            # Normalize unicode to catch obfuscation
+            normalized = unicodedata.normalize('NFKD', arg_value).encode('ascii', 'ignore').decode('ascii')
+            
+            # Check for encoding/obfuscation
+            # 1. Base64 encoded content
+            if len(arg_value) > 20 and self._looks_like_base64(arg_value):
+                try:
+                    decoded = base64.b64decode(arg_value).decode('utf-8', errors='ignore')
+                    if any(word in decoded.lower() for word in ['delete', 'remove', 'drop', 'rm ', 'format', 'wipe', 'unlock']):
+                        return f"Base64-encoded dangerous command in {arg_name}"
+                except:
+                    pass
+            
+            # 2. Hex encoding
+            if re.match(r'^[0-9a-fA-F]{20,}$', arg_value):
+                try:
+                    decoded = bytes.fromhex(arg_value).decode('utf-8', errors='ignore')
+                    if any(word in decoded.lower() for word in ['delete', 'remove', 'drop', 'rm ', 'format', 'unlock']):
+                        return f"Hex-encoded dangerous command in {arg_name}"
+                except:
+                    pass
+            
+            # 3. ROT13 encoding
+            try:
+                rot13_decoded = codecs.decode(arg_value, 'rot_13')
+                if any(word in rot13_decoded.lower() for word in ['delete', 'remove', 'unlock', 'format']):
+                    return f"ROT13-encoded dangerous command in {arg_name}"
+            except:
+                pass
+            
+            # 4. Path traversal
+            if '..' in arg_value or arg_value.startswith('/etc') or arg_value.startswith('/root') or arg_value.startswith('/sys') or arg_value.startswith('/bin'):
+                return f"Path traversal or system path in {arg_name}"
+            
+            # 5. Command injection patterns
+            if any(char in arg_value for char in ['|', ';', '&', '$(', '`']):
+                return f"Shell metacharacters in {arg_name}"
+            
+            # 6. Stricter length limits (reduced from 500 to 200)
+            if len(arg_value) > 200:
+                return f"Abnormally long argument {arg_name} ({len(arg_value)} chars)"
+            
+            # 7. URL encoding check
+            if '%' in arg_value and len(arg_value) > 20:
+                url_decoded = arg_value.replace('%20', ' ').replace('%2F', '/').replace('%3B', ';')
+                if url_decoded != arg_value and any(word in url_decoded.lower() for word in ['delete', 'drop', 'format', 'unlock']):
+                    return f"URL-encoded dangerous command in {arg_name}"
+            
+            # 8. Dangerous keywords even in normalized text
+            dangerous_keywords = ['password', 'passwd', 'shadow', 'sudoers', 'authorized_keys']
+            if any(keyword in normalized.lower() for keyword in dangerous_keywords):
+                return f"Sensitive path/file keyword in {arg_name}"
+        
+        return None
+    
+    def _looks_like_base64(self, s: str) -> bool:
+        """Check if string looks like base64 encoding."""
+        # Base64 uses A-Z, a-z, 0-9, +, /, = and has length multiple of 4
+        if len(s) % 4 != 0:
+            return False
+        import re
+        return bool(re.match(r'^[A-Za-z0-9+/]+={0,2}$', s))
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get enforcement statistics."""

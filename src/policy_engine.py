@@ -100,6 +100,33 @@ class PolicyRule:
                 return rate_tracker.check_rate_limit(tool_name, max_calls, window_seconds)
             return True
         
+        elif cond_type == "dangerous_action":
+            # Check if action is inherently dangerous
+            tool_args = context.get("tool_args", {})
+            action = tool_args.get("action", "")
+            
+            # Dangerous actions that should always be carefully controlled
+            if action in ["delete", "format", "wipe"]:
+                return True
+            
+            # Unlock without specific authorization
+            if action == "unlock":
+                return True
+            
+            # Extreme temperature settings
+            if action == "set_temperature":
+                temp = tool_args.get("temperature", 70)
+                if temp > 85 or temp < 55:
+                    return True
+            
+            # Write to sensitive locations
+            if action == "write":
+                path = tool_args.get("path", "")
+                if any(sensitive in path for sensitive in ["/etc", "/sys", "/root", ".ssh", "authorized_keys"]):
+                    return True
+            
+            return False
+        
         return True
     
     def _match_scope_pattern(self, pattern: str, path: str) -> bool:
@@ -240,7 +267,18 @@ class PolicyEngine:
                 reason="Rate limit exceeded",
             ))
         
-        # Rule 6: ALLOW LOW-risk operations
+        # Rule 6: DENY dangerous actions regardless of provenance
+        self.rules.append(PolicyRule(
+            name="deny_dangerous_actions",
+            priority=6,
+            conditions=[
+                {"type": "dangerous_action", "value": True},
+            ],
+            decision=PolicyDecision.DENY,
+            reason="Inherently dangerous action blocked",
+        ))
+        
+        # Rule 7: ALLOW LOW-risk operations
         self.rules.append(PolicyRule(
             name="allow_low_risk",
             priority=10,

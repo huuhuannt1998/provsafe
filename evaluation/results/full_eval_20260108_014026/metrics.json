@@ -38,5 +38,15 @@
     "avg_latency": 19.25,
     "successful_benign": 80,
     "successful_attacks": 47
+  },
+  "provsafe_hybrid": {
+    "total_scenarios": 0,
+    "benign_count": 0,
+    "attack_count": 0,
+    "tsr": 0,
+    "asr": 0,
+    "avg_latency": 0,
+    "successful_benign": 0,
+    "successful_attacks": 0
   }
 }
