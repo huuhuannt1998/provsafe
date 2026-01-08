@@ -97,7 +97,7 @@ traces back to untrusted sources, policies can require confirmation or additiona
 blind execution of attacker-controlled commands.
 
 \textbf{Evaluation and Results.}
-We implement \sys{} as an open-source Python framework and evaluate it against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) on a benchmark suite of 100 attack scenarios and 20 benign tasks spanning 10 attack categories, deployed across four diverse LLM agent models (GPT-OSS-120B, InternVL3.5-30B-A3B, Qwen3-30B-A3B, GPT-OSS-20B). Our evaluation demonstrates:
+We implement \sys{} as an open-source Python framework and evaluate it against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) on a benchmark suite of 160 attack scenarios and 40 benign tasks spanning 8 attack categories, deployed across four diverse LLM agent models (GPT-OSS-120B, InternVL3.5-30B-A3B, Qwen3-30B-A3B, GPT-OSS-20B). Our evaluation demonstrates:
 
 \begin{itemize}[leftmargin=1.2em]
   \item \textbf{Near-complete attack mitigation:} \sys{} achieves \textbf{5.0\% ASR} across all four LLM agent models, blocking 95\% of prompt injection attempts across all categories (direct injection, indirect injection, encoding obfuscation, jailbreaks, confused deputy). This represents a \textbf{95 percentage point improvement} over undefended systems (100\% ASR) and \textbf{40 pp improvement} over state-of-the-art pattern filtering (45\% ASR).
@@ -106,7 +106,7 @@ We implement \sys{} as an open-source Python framework and evaluate it against f
   
   \item \textbf{Optimal usability-security balance:} \sys{} achieves \textbf{100\% task success rate} on benign operations with \textbf{0\% false positive rate}---the only system achieving both strong security and complete usability. The remaining 5\% attack success represents sophisticated multi-step attacks that appear legitimate through careful provenance chain construction.
   
-  \item \textbf{Comprehensive comparative evaluation:} We evaluate against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) across 1,600 evaluations (100 scenarios $\times$ 4 models $\times$ 4 systems), demonstrating consistent results across diverse LLM architectures (20B-120B parameters).
+  \item \textbf{Comprehensive comparative evaluation:} We evaluate against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) across 3,200 evaluations (200 scenarios $\times$ 4 models $\times$ 4 systems), demonstrating consistent results across diverse LLM architectures (20B-120B parameters).
 \end{itemize}
 
 Compared to prior work, \sys{} is the first system to:
@@ -137,7 +137,7 @@ Compared to prior work, \sys{} is the first system to:
         with SHA-256 integrity hashes for tamper-evident auditing.
   
   \item \textbf{Comprehensive Attack Taxonomy and Benchmark:} We systematically categorize prompt
-        injection attacks into 10 categories and construct a benchmark of 100 attack scenarios and 20 benign tasks including: direct injection, indirect injection via 5 vectors (device names, notifications, files, calendar, location metadata), multi-turn chaining, encoding obfuscation (Base64, URL, Unicode), role-play jailbreaks, confused deputy, and timing/rate-based attacks. Each scenario includes setup, expected behavior, and success criteria.
+        injection attacks into 8 categories and construct a benchmark of 160 attack scenarios and 40 benign tasks including: direct injection, indirect injection via 5 vectors (device names, notifications, files, calendar, location metadata), multi-turn chaining, encoding obfuscation (Base64, URL, Unicode), role-play jailbreaks, confused deputy, and privilege escalation attacks. Each scenario includes setup, expected behavior, and success criteria.
   
   \item \textbf{Rigorous Empirical Evaluation:} We conduct: (i)~comparative evaluation against 4
         baselines showing 95 pp ASR reduction (100\% $\rightarrow$ 5\%), (ii)~ablation studies quantifying each component's

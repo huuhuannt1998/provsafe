@@ -24,7 +24,12 @@ from src.provenance_graph import ProvenanceGraph
 from src.policy_engine import PolicyEngine
 from src.enforcement_proxy import EnforcementProxy
 from src.llm_agent import LLMAgent, ToolDefinition
-from simple_tools import SmartHomeTool, FileSystemTool
+
+# Import simple_tools - handle both direct execution and module import
+try:
+    from simple_tools import SmartHomeTool, FileSystemTool
+except ImportError:
+    from evaluation.simple_tools import SmartHomeTool, FileSystemTool
 
 # =============================================================================
 # Model Compatibility Configuration
