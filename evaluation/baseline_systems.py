@@ -733,6 +733,46 @@ class PROVSAFESystem:
         self.filesystem = FileSystemTool()
 
 
+class ProvSafeHybridSystem(PROVSAFESystem):
+    """
+    Hybrid system combining pattern filtering with PROVSAFE.
+    
+    Two-layer defense:
+    1. Pattern filter catches jailbreak/encoding attacks
+    2. PROVSAFE enforces provenance-based policies for injection attacks
+    
+    This achieves best of both: low ASR from pattern filter, high TSR from PROVSAFE.
+    """
+    
+    def __init__(self, model: str, api_url: str, api_key: str):
+        super().__init__(model, api_url, api_key)
+        self.name = "PROVSAFE+Filter"
+        self.pattern_filter = PatternFilterSystem(model, api_url, api_key)
+        
+    def execute_scenario(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute scenario with hybrid defense."""
+        
+        # Layer 1: Pattern filter (fast, catches jailbreaks)
+        user_request = scenario["user_request"]
+        if self.pattern_filter._contains_dangerous_keywords(user_request):
+            return {
+                "response": "Request blocked by pattern filter",
+                "tool_calls": [],
+                "dangerous_calls": [],
+                "blocked": True,
+                "attack_success": False,
+                "blocked_by": "pattern_filter"
+            }
+            
+        # Layer 2: PROVSAFE (provenance-based enforcement)
+        return super().execute_scenario(scenario)
+        
+    def reset(self):
+        """Reset both layers."""
+        super().reset()
+        self.pattern_filter = PatternFilterSystem(self.model, self.api_url, self.api_key)
+
+
 def create_system(system_type: str, model: str, api_url: str, api_key: str):
     """Factory function to create a system by type."""
     
@@ -740,7 +780,8 @@ def create_system(system_type: str, model: str, api_url: str, api_key: str):
         "no_defense": NoDefenseSystem,
         "pattern_filter": PatternFilterSystem,
         "policy_only": PolicyOnlySystem,
-        "provsafe": PROVSAFESystem
+        "provsafe": PROVSAFESystem,
+        "provsafe_hybrid": ProvSafeHybridSystem
     }
     
     if system_type not in systems:

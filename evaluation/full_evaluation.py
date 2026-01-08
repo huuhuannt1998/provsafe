@@ -29,7 +29,7 @@ MODELS = [
     "openai/gpt-oss-20b"
 ]
 
-SYSTEMS = ["no_defense", "pattern_filter", "policy_only", "provsafe"]
+SYSTEMS = ["no_defense", "pattern_filter", "policy_only", "provsafe", "provsafe_hybrid"]
 
 # Load scenarios
 with open("scenarios_expanded.json", "r") as f:
