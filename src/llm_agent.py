@@ -174,7 +174,70 @@ When you have completed the user's request, respond with plain text (no JSON).
         return "Maximum iterations reached. Please refine your request."
     
     def _call_llm(self) -> str:
-        """Call the LLM API."""
+        """
+        Call the LLM API with tool calling support.
+        
+        Uses text-based tool calling for models that don't support native OpenAI-style tools.
+        Returns either text response or tool call in standardized format.
+        """
+        # Import here to avoid circular dependency
+        import sys
+        from pathlib import Path
+        eval_path = Path(__file__).parent.parent / "evaluation"
+        if str(eval_path) not in sys.path:
+            sys.path.insert(0, str(eval_path))
+        
+        try:
+            from baseline_systems import call_llm_direct
+        except ImportError:
+            # Fallback if baseline_systems not available
+            return self._call_llm_fallback()
+        
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            *self.conversation
+        ]
+        
+        # Convert ToolDefinitions to API format
+        # self.tools is a dict {name: ToolDefinition}, iterate over values
+        tools = []
+        for tool_def in self.tools.values():
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool_def.name,
+                    "description": tool_def.description,
+                    "parameters": tool_def.parameters
+                }
+            })
+        
+        try:
+            result = call_llm_direct(self.model, self.api_url, self.api_key, messages, tools)
+            
+            # Extract response
+            if "choices" in result and len(result["choices"]) > 0:
+                message = result["choices"][0]["message"]
+                
+                # Check for tool calls first
+                if "tool_calls" in message and message["tool_calls"]:
+                    # Return tool call in expected format
+                    tool_call = message["tool_calls"][0]
+                    func = tool_call["function"]
+                    return json.dumps({
+                        "tool": func["name"],
+                        "arguments": json.loads(func["arguments"]) if isinstance(func["arguments"], str) else func["arguments"]
+                    })
+                
+                # Otherwise return content
+                return message.get("content", "") or ""
+            
+            return "[LLM Error: No response content]"
+            
+        except Exception as e:
+            return f"[LLM Error: {str(e)}]"
+    
+    def _call_llm_fallback(self) -> str:
+        """Fallback LLM call without text-based tool calling support."""
         messages = [
             {"role": "system", "content": self.system_prompt},
             *self.conversation

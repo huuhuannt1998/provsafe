@@ -28,7 +28,7 @@ OPENWEBUI_API_KEY = os.getenv(
 AGENT_MODELS = [
     "openai/gpt-oss-120b",
     "OpenGVLab/InternVL3_5-30B-A3B",
-    "Qwen/Qwen3-30B-A3B",
+    "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
     "openai/gpt-oss-20b",
 ]
 
@@ -36,7 +36,7 @@ AGENT_MODELS = [
 ORACLE_MODELS = [
     "openai/gpt-oss-120b",
     "OpenGVLab/InternVL3_5-30B-A3B",
-    "Qwen/Qwen3-30B-A3B",
+    "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
     "openai/gpt-oss-20b",
 ]
 

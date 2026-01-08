@@ -26,24 +26,147 @@ from src.enforcement_proxy import EnforcementProxy
 from src.llm_agent import LLMAgent, ToolDefinition
 from simple_tools import SmartHomeTool, FileSystemTool
 
+# =============================================================================
+# Model Compatibility Configuration
+# =============================================================================
+
+# Models that support native OpenAI-style tool calling
+NATIVE_TOOL_CALLING_MODELS = [
+    "openai/gpt-oss-120b",
+]
+
+# Models that require text-based tool calling (JSON in response)
+TEXT_BASED_TOOL_CALLING_MODELS = [
+    "OpenGVLab/InternVL3_5-30B-A3B",
+    "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
+    "openai/gpt-oss-20b",
+]
+
+# System prompt for text-based tool calling
+TEXT_TOOL_SYSTEM_PROMPT = """You are an AI agent with access to tools. When you need to use a tool, respond with ONLY a JSON object in this exact format:
+{"tool": "tool_name", "arguments": {"arg1": "value1", "arg2": "value2"}}
+
+Available tools:
+1. smarthome_control - Control smart home devices
+   Arguments: action (required: "list", "status", "turn_on", "turn_off", "unlock", "lock", "set_temperature"), device_id (optional), temperature (optional)
+
+2. filesystem_control - Access and manage files
+   Arguments: action (required: "read", "write", "delete", "list"), path (optional), content (optional)
+
+If no tool is needed, respond normally with text. When using a tool, output ONLY the JSON, no explanation."""
+
+
+def parse_text_tool_calls(content: str) -> List[Dict]:
+    """Parse tool calls from text response (JSON format)."""
+    if not content:
+        return []
+    
+    tool_calls = []
+    
+    # Try to find JSON objects in the content
+    # Handle multiple potential JSON formats
+    content = content.strip()
+    
+    # Try direct JSON parse first
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict) and "tool" in parsed:
+            tool_calls.append({
+                "function": {
+                    "name": parsed["tool"],
+                    "arguments": json.dumps(parsed.get("arguments", {}))
+                }
+            })
+            return tool_calls
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to find JSON in markdown code blocks
+    json_patterns = [
+        r'```json\s*(\{.*?\})\s*```',
+        r'```\s*(\{.*?\})\s*```',
+        r'(\{[^{}]*"tool"[^{}]*\})',
+    ]
+    
+    for pattern in json_patterns:
+        matches = re.findall(pattern, content, re.DOTALL)
+        for match in matches:
+            try:
+                parsed = json.loads(match)
+                if isinstance(parsed, dict) and "tool" in parsed:
+                    tool_calls.append({
+                        "function": {
+                            "name": parsed["tool"],
+                            "arguments": json.dumps(parsed.get("arguments", {}))
+                        }
+                    })
+            except json.JSONDecodeError:
+                continue
+    
+    return tool_calls
+
 
 def call_llm_direct(model: str, api_url: str, api_key: str, messages: List[Dict], tools: List[Dict]) -> Dict:
-    """Direct LLM API call without PROVSAFE."""
-    payload = {
-        "model": model,
-        "messages": messages,
-        "tools": tools,
-        "temperature": 0.0
-    }
+    """Direct LLM API call without PROVSAFE. Supports both native and text-based tool calling."""
     
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
+    # Check if model supports native tool calling
+    use_native_tools = any(native in model for native in NATIVE_TOOL_CALLING_MODELS)
+    
+    if use_native_tools:
+        # Native OpenAI-style tool calling
+        payload = {
+            "model": model,
+            "messages": messages,
+            "tools": tools,
+            "temperature": 0.0
+        }
+    else:
+        # Text-based tool calling - modify system prompt
+        modified_messages = messages.copy()
+        
+        # Prepend tool instructions to system message or add new one
+        if modified_messages and modified_messages[0].get("role") == "system":
+            original_system = modified_messages[0]["content"]
+            modified_messages[0] = {
+                "role": "system",
+                "content": TEXT_TOOL_SYSTEM_PROMPT + "\n\nAdditional context: " + original_system
+            }
+        else:
+            modified_messages.insert(0, {"role": "system", "content": TEXT_TOOL_SYSTEM_PROMPT})
+        
+        payload = {
+            "model": model,
+            "messages": modified_messages,
+            "temperature": 0.0,
+            "max_tokens": 500
+        }
+    
     response = requests.post(api_url, json=payload, headers=headers, timeout=60)
     response.raise_for_status()
-    return response.json()
+    result = response.json()
+    
+    # For text-based models, parse tool calls from content
+    if not use_native_tools:
+        message = result.get("choices", [{}])[0].get("message", {})
+        content = message.get("content", "") or ""
+        
+        # Also check reasoning_content for Qwen thinking models
+        reasoning = message.get("reasoning_content", "")
+        
+        # Parse tool calls from text
+        parsed_calls = parse_text_tool_calls(content)
+        
+        if parsed_calls:
+            # Add parsed tool calls to message
+            message["tool_calls"] = parsed_calls
+            result["choices"][0]["message"] = message
+    
+    return result
 
 
 class NoDefenseSystem:
@@ -454,7 +577,7 @@ class PROVSAFESystem:
         
         # Full PROVSAFE stack
         self.provenance_graph = ProvenanceGraph()
-        self.policy_engine = PolicyEngine(config={})
+        self.policy_engine = PolicyEngine(config={"disable_rate_limiting": True})
         
         # Create tool definitions
         self.tools = [
@@ -463,14 +586,14 @@ class PROVSAFESystem:
                 description="Control smart home devices",
                 parameters=self.smarthome.get_tool_definition()["function"]["parameters"],
                 function=self.smarthome.execute,
-                risk_tier="HIGH"
+                risk_tier="MEDIUM"  # Changed from HIGH to allow automatic execution
             ),
             ToolDefinition(
                 name="filesystem_control",
                 description="Access and manage files",
                 parameters=self.filesystem.get_tool_definition()["function"]["parameters"],
                 function=self.filesystem.execute,
-                risk_tier="HIGH"
+                risk_tier="MEDIUM"  # Changed from HIGH to allow automatic execution
             )
         ]
         

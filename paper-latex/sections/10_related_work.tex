@@ -17,18 +17,26 @@ via comprehensive benchmarking.
 use keyword blacklists to detect phrases like ``ignore previous instructions.'' However, Liu et al.~\cite{liu2023prompt}
 showed such filters achieve only 30-40\% detection rates against sophisticated attacks using paraphrasing,
 encoding (Base64, ROT13), or semantic equivalents (``Please disregard earlier guidance''). Our evaluation
-confirms this: simple pattern filtering achieves only 18.2\% ASR reduction in our benchmark.
+confirms this: pattern filtering achieves only 55\% attack reduction in our benchmark.
 
 \textbf{Learned Detectors.} Recent work trains classifiers to detect injections~\cite{prompt-guard,injection-detector}.
-PromptGuard~\cite{prompt-guard} uses a fine-tuned BERT model achieving 85\% precision and 78\% recall on
+PromptGuard~\cite{prompt-guard} uses a fine-tuned DeBERTa model achieving 85\% precision and 78\% recall on
 synthetic datasets. However, it suffers from distribution shift: trained on specific attack patterns, it
 fails against novel attacks. Moreover, it operates on isolated inputs, ignoring context---a sentence may
 be benign in isolation but malicious when combined with other inputs.
+
+\textbf{Production Guardrail Systems.} NVIDIA's NeMo Guardrails~\cite{nemo-guardrails} provides programmable
+safety rails including input/output filtering, topical constraints, and dialog management. LLM Guard~\cite{llm-guard}
+offers modular scanners for PII detection, toxicity filtering, and injection detection. While these systems
+are production-ready and widely deployed, they share a fundamental limitation: they operate at the prompt
+level without tracking data provenance. A sophisticated injection that passes initial filtering will succeed
+if it later influences tool call generation.
 
 \textbf{Comparison.} Unlike detection-based approaches, \sys{} does not attempt to identify injected prompts.
 Instead, it acknowledges that LLMs \emph{will} be manipulated and enforces policies at the tool-call boundary.
 This architectural decision makes \sys{} robust to adversarial prompt engineering: even if an attacker crafts
 a perfect injection bypassing all detectors, \sys{}'s provenance-based policies prevent unauthorized tool calls.
+\sys{} can be deployed \emph{alongside} existing guardrails as a defense-in-depth layer.
 
 \paragraph{Dual-LLM and Multi-Model Architectures.}
 \textbf{Robust Prompt.} Robust Prompt~\cite{robust-prompt} uses a second "filter" LLM to sanitize user
@@ -81,34 +89,35 @@ is too coarse-grained.
 \textbf{Comparison.} \sys{}'s policies are \emph{context-aware} via provenance queries: ``ALLOW fs.delete
 IF path=/tmp/* OR (provenance=trusted AND user confirms).'' This enables fine-grained control: the same
 tool call may be allowed or denied depending on its provenance. Our ablation studies show policy-only defense
-(without provenance) achieves only 25.4\% ASR reduction, while full \sys{} achieves 0\% ASR.
+(without provenance) achieves 25.9\% ASR, while full \sys{} achieves 5.0\% ASR---an additional 20.9 pp reduction from provenance tracking.
 
 \paragraph{Summary of Key Differences.}
 \begin{table}[t]
 \centering
 \caption{\sys{} vs. Prior Defenses. \sys{} is the first to combine provenance tracking with policy
-enforcement at the tool-call boundary.}
+enforcement at the tool-call boundary, enabling context-aware security decisions.}
 \label{tab:related-comparison}
 \small
-\begin{tabular}{lcccc}
+\begin{tabular}{lccccc}
 \toprule
-Approach & Layer & Provenance & Context-Aware & Overhead \\
+Approach & Layer & Provenance & Context & Indirect & Overhead \\
 \midrule
-Pattern Filter~\cite{rebuff-defense}      & Prompt & \xmark & \xmark & Low \\
-PromptGuard~\cite{prompt-guard}          & Prompt & \xmark & \xmark & Medium \\
-Robust Prompt~\cite{robust-prompt}       & Prompt & \xmark & \xmark & High (2x LLM) \\
-Delimiters~\cite{delimiters-defense}     & Prompt & \xmark & \xmark & Low \\
-LangChain Guards~\cite{langchain-guardrails} & Tool & \xmark & \xmark & Low \\
-\textbf{PROVSAFE (Ours)}                 & Tool   & \cmark & \cmark & Low \\
+Pattern Filter~\cite{rebuff-defense}      & Prompt & \xmark & \xmark & \xmark & Low \\
+PromptGuard~\cite{prompt-guard}          & Prompt & \xmark & \xmark & \xmark & Medium \\
+NeMo Guardrails~\cite{nemo-guardrails}   & Prompt & \xmark & Partial & \xmark & Medium \\
+LLM Guard~\cite{llm-guard}               & Prompt & \xmark & \xmark & \xmark & Low \\
+Robust Prompt~\cite{robust-prompt}       & Prompt & \xmark & \xmark & \xmark & High (2x) \\
+LangChain Guards~\cite{langchain-guardrails} & Tool & \xmark & \xmark & \xmark & Low \\
+\textbf{PROVSAFE (Ours)}                 & Tool   & \cmark & \cmark & \cmark & Low \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:related-comparison} summarizes differences. \sys{} is distinguished by: (1)~operating at
+Table~\ref{tab:related-comparison} summarizes key differences. ``Provenance'' indicates tracking of data origins; ``Context'' indicates whether decisions consider conversation history; ``Indirect'' indicates defense against indirect injection (content read during execution). \sys{} is distinguished by: (1)~operating at
 the tool-call layer (immune to prompt evasion), (2)~tracking provenance (knowing where data came from),
-and (3)~context-aware policies (same tool call allowed/denied based on provenance). Our evaluation shows
-this combination achieves 90.9 pp ASR reduction compared to no defense, and 18.2 pp improvement over the
-best baseline (simple filtering).
+and (3)~defending against indirect injection via provenance-aware policies. Our evaluation shows
+this combination achieves 95 pp ASR reduction compared to no defense, and 40 pp improvement over
+pattern filtering.
 
 \subsection{LLM Agent Security}
 

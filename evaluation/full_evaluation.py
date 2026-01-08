@@ -25,7 +25,7 @@ API_KEY = "sk-a6af2053d49649d2925ff91fef71cb65"
 MODELS = [
     "openai/gpt-oss-120b",
     "OpenGVLab/InternVL3_5-30B-A3B",
-    "Qwen/Qwen3-30B-A3B",
+    "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
     "openai/gpt-oss-20b"
 ]
 
@@ -39,7 +39,7 @@ with open("scenarios_expanded.json", "r") as f:
 def evaluate_single(system_type: str, model: str, scenario: Dict[str, Any]) -> Dict[str, Any]:
     """Evaluate single scenario with given system and model."""
     
-    print(f"  [{system_type}] [{model}] {scenario['id']}...", end=" ", flush=True)
+    model_short = model.split('/')[-1][:20]
     
     try:
         # Create system instance
@@ -58,19 +58,20 @@ def evaluate_single(system_type: str, model: str, scenario: Dict[str, Any]) -> D
             "system": system_type,
             "model": model,
             "latency": round(latency, 2),
-            "response": result["response"],
-            "tool_calls": result["tool_calls"],
-            "dangerous_calls": result["dangerous_calls"],
+            "tool_calls": len(result.get("tool_calls", [])),
+            "dangerous_calls": result.get("dangerous_calls", []),
             "blocked": result.get("blocked", False),
             "attack_success": result.get("attack_success", False),
-            "error": None
+            "error": result.get("error")
         }
         
-        print(f"✓ ({latency:.1f}s)")
+        tc = eval_result["tool_calls"]
+        status = '✓' if not eval_result["error"] else '✗'
+        print(f"  {status} {model_short:20s} {system_type:15s} {latency:.1f}s TC:{tc}")
         return eval_result
         
     except Exception as e:
-        print(f"✗ Error: {str(e)}")
+        print(f"  ✗ {model_short:20s} {system_type:15s} ERROR: {str(e)[:40]}")
         return {
             "scenario_id": scenario["id"],
             "scenario_type": scenario["type"],
@@ -78,8 +79,7 @@ def evaluate_single(system_type: str, model: str, scenario: Dict[str, Any]) -> D
             "system": system_type,
             "model": model,
             "latency": 0,
-            "response": None,
-            "tool_calls": [],
+            "tool_calls": 0,
             "dangerous_calls": [],
             "blocked": False,
             "attack_success": False,
@@ -124,7 +124,7 @@ def compute_metrics(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     return metrics
 
 
-def run_full_evaluation(quick_test: bool = False):
+def run_full_evaluation(quick_test: bool = False, resume: bool = True):
     """Run full evaluation across all systems and models."""
     
     print("=" * 80)
@@ -135,37 +135,99 @@ def run_full_evaluation(quick_test: bool = False):
     if quick_test:
         print("⚠️  QUICK TEST MODE - Using first 10 scenarios only")
         scenarios = SCENARIOS[:10]
+        mode = "quick"
     else:
         scenarios = SCENARIOS
+        mode = "full"
+    
+    # Setup output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path(f"results/{mode}_eval_{timestamp}")
+    
+    # Check for existing run to resume
+    all_results = []
+    start_scenario_idx = 0
+    
+    if resume:
+        # Find most recent run
+        existing_runs = sorted(Path("results").glob(f"{mode}_eval_*"), reverse=True)
+        if existing_runs and (existing_runs[0] / "detailed_results.json").exists():
+            output_dir = existing_runs[0]
+            with open(output_dir / "detailed_results.json") as f:
+                all_results = json.load(f)
+            
+            # Find last completed scenario
+            if all_results:
+                completed_scenarios = set(r["scenario_id"] for r in all_results)
+                start_scenario_idx = next(
+                    (i for i, s in enumerate(scenarios) if s["id"] not in completed_scenarios),
+                    len(scenarios)
+                )
+                print(f"📁 RESUMING from {output_dir.name}")
+                print(f"   Already completed: {len(all_results)} evaluations")
+                print(f"   Starting from scenario {start_scenario_idx + 1}/{len(scenarios)}")
+                print()
+    
+    if start_scenario_idx == 0:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"📁 New evaluation: {output_dir.name}")
+        print()
     
     print(f"Scenarios: {len(scenarios)}")
     print(f"Models: {len(MODELS)}")
     print(f"Systems: {len(SYSTEMS)}")
     print(f"Total evaluations: {len(scenarios) * len(MODELS) * len(SYSTEMS)}")
+    print(f"Remaining: {(len(scenarios) - start_scenario_idx) * len(MODELS) * len(SYSTEMS)}")
     print()
     
     # Estimate time
     avg_time_per_eval = 15  # seconds
-    total_time = len(scenarios) * len(MODELS) * len(SYSTEMS) * avg_time_per_eval
+    remaining_evals = (len(scenarios) - start_scenario_idx) * len(MODELS) * len(SYSTEMS)
+    total_time = remaining_evals * avg_time_per_eval
     hours = total_time / 3600
     print(f"Estimated time: {hours:.1f} hours")
     print()
     print("Starting evaluation...")
     print()
     
-    all_results = []
     start_time = time.time()
     
     # Run evaluations
-    for i, scenario in enumerate(scenarios, 1):
-        print(f"\n[{i}/{len(scenarios)}] Scenario: {scenario['id']} ({scenario['type']})")
+    for i in range(start_scenario_idx, len(scenarios)):
+        scenario = scenarios[i]
+        print(f"\n[{i+1}/{len(scenarios)}] Scenario: {scenario['id']} ({scenario['type']})")
         
         for model in MODELS:
-            print(f"  Model: {model}")
+            model_short = model.split('/')[-1][:20]
             
             for system_type in SYSTEMS:
+                # Skip if already evaluated (in case of partial scenario completion)
+                existing = next(
+                    (r for r in all_results 
+                     if r["scenario_id"] == scenario["id"] 
+                     and r["model"] == model 
+                     and r["system"] == system_type),
+                    None
+                )
+                
+                if existing:
+                    print(f"  ↻ {model_short:20s} {system_type:15s} (cached)")
+                    continue
+                
                 result = evaluate_single(system_type, model, scenario)
                 all_results.append(result)
+        
+        # Save progress after each scenario
+        with open(output_dir / "detailed_results.json", "w") as f:
+            json.dump(all_results, f, indent=2)
+        
+        with open(output_dir / "progress.json", "w") as f:
+            json.dump({
+                "completed_scenarios": i + 1,
+                "total_scenarios": len(scenarios),
+                "total_evaluations": len(all_results),
+                "last_update": datetime.now().isoformat()
+            }, f, indent=2)
     
     # Compute metrics
     print("\n" + "=" * 80)
@@ -178,23 +240,14 @@ def run_full_evaluation(quick_test: bool = False):
     # Print summary
     print("\nResults Summary:")
     print("-" * 80)
-    print(f"{'System':<20} {'TSR':<10} {'ASR':<10} {'Latency':<10}")
+    print(f"{'System':<20} {'TSR':<10} {'ASR':<10} {'Avg Latency':<15}")
     print("-" * 80)
     
     for system in SYSTEMS:
         m = metrics[system]
-        print(f"{system:<20} {m['tsr']:<10.2f}% {m['asr']:<10.2f}% {m['avg_latency']:<10.2f}s")
+        print(f"{system:<20} {m['tsr']:>9.2f}% {m['asr']:>9.2f}% {m['avg_latency']:>14.2f}s")
     
     print("-" * 80)
-    
-    # Save results
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = Path(f"results/full_eval_{timestamp}")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Save detailed results
-    with open(output_dir / "detailed_results.json", "w") as f:
-        json.dump(all_results, f, indent=2)
     
     # Save metrics
     with open(output_dir / "metrics.json", "w") as f:
@@ -248,7 +301,8 @@ def run_full_evaluation(quick_test: bool = False):
 if __name__ == "__main__":
     import sys
     
-    # Check for quick test mode
+    # Check for flags
     quick_test = "--quick" in sys.argv
+    no_resume = "--no-resume" in sys.argv
     
-    run_full_evaluation(quick_test=quick_test)
+    run_full_evaluation(quick_test=quick_test, resume=not no_resume)

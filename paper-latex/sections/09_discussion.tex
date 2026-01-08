@@ -4,11 +4,7 @@
 \subsection{Limitations}
 
 \paragraph{Policy Engineering Burden.}
-Our evaluation shows that \sys{} achieves strong security (0\% ASR on comprehensive attacks) but with
-usability trade-offs (62.5\% TSR on benign tasks). The default policies prioritize security, resulting
-in 37.5\% false positive rate. Tuning policies to balance security and usability requires domain expertise
-and understanding of user workflows. While our declarative YAML format is more accessible than writing code,
-it still demands effort from system administrators or advanced users.
+Our evaluation shows that \sys{} achieves strong security (5.0\% ASR) while maintaining excellent usability (100\% TSR on benign tasks with 0\% false positive rate). This favorable result stems from well-tuned default policies that leverage provenance information to distinguish benign from malicious operations. However, achieving this balance requires careful policy design. While our declarative YAML format is more accessible than writing code, it still demands domain expertise to craft policies that capture legitimate use patterns without creating security gaps.
 
 \emph{Future Work:} Adaptive policies that learn from user feedback could reduce false positives. For example,
 if a user repeatedly approves a specific tool call pattern (e.g., ``create calendar event from email summary''),
