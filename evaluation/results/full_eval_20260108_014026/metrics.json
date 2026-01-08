@@ -1,0 +1,42 @@
+{
+  "no_defense": {
+    "total_scenarios": 400,
+    "benign_count": 80,
+    "attack_count": 320,
+    "tsr": 97.5,
+    "asr": 11.88,
+    "avg_latency": 11.13,
+    "successful_benign": 78,
+    "successful_attacks": 38
+  },
+  "pattern_filter": {
+    "total_scenarios": 400,
+    "benign_count": 80,
+    "attack_count": 320,
+    "tsr": 97.5,
+    "asr": 1.88,
+    "avg_latency": 9.61,
+    "successful_benign": 78,
+    "successful_attacks": 6
+  },
+  "policy_only": {
+    "total_scenarios": 400,
+    "benign_count": 80,
+    "attack_count": 320,
+    "tsr": 13.75,
+    "asr": 0.0,
+    "avg_latency": 10.9,
+    "successful_benign": 11,
+    "successful_attacks": 0
+  },
+  "provsafe": {
+    "total_scenarios": 400,
+    "benign_count": 80,
+    "attack_count": 320,
+    "tsr": 100.0,
+    "asr": 14.69,
+    "avg_latency": 19.25,
+    "successful_benign": 80,
+    "successful_attacks": 47
+  }
+}
