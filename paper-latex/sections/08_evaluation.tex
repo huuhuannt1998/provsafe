@@ -116,7 +116,7 @@ Policy-Only            & 0.00\% & 21.25\% & 52.7\% & 11.94 & 100.0\% \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig1_asr_comparison.pdf}
-\caption{\textbf{Attack Success Rate Comparison.} \sys{} achieves 5.0\% ASR, a 95\% reduction compared to the undefended baseline. Pattern filtering alone allows 45\% of attacks, while policy-only allows 25.9\%.}
+\caption{\textbf{Attack Success Rate Comparison.} \sys{} achieves 0.16\% ASR (1/640 attacks), a 98.7\% reduction compared to the 12.34\% undefended baseline. Pattern filtering reduces ASR to 3.12\%, while policy-only achieves 0\% at severe usability cost.}
 \label{fig:asr_comparison}
 \end{figure}
 
@@ -131,7 +131,7 @@ The \textbf{Policy-Only} configuration achieves 0\% ASR by aggressively blocking
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig3_category_heatmap.pdf}
-\caption{\textbf{Per-Category Attack Success Rate.} \sys{} achieves consistently low ASR across all 8 attack categories, with particularly strong protection against file content injection (0\%), multi-turn chaining (0\%), and encoding obfuscation (0\%).}
+\caption{\textbf{Per-Category Attack Success Rate Heatmap.} \sys{} achieves near-zero ASR across all 8 attack categories. Encoding obfuscation (47.2\% baseline) and role-play jailbreaks (27.5\% baseline) are completely blocked. Only multi-turn chaining shows non-zero ASR (1.2\%, 1 attack).}
 \label{fig:category_heatmap}
 \end{figure}
 
@@ -188,7 +188,7 @@ No Defense             & 12.34\% & 96.88\% & --- & Baseline vulnerability \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig5_ablation_study.pdf}
-\caption{\textbf{Ablation Study.} Pattern filtering provides initial protection (74.7\% ASR reduction). Policy-only achieves complete security but destroys usability (21.25\% TSR). Provenance tracking restores usability while maintaining security.}
+\caption{\textbf{Ablation Study: ASR vs TSR.} Red bars show ASR (lower=better); green bars show TSR (higher=better). Pattern filtering reduces ASR from 12.34\% to 3.12\%. Policy-only achieves 0\% ASR but destroys usability (21.25\% TSR). Adding provenance tracking restores TSR to 98.12\% (+77\%) while maintaining near-zero ASR.}
 \label{fig:ablation_study}
 \end{figure}
 
@@ -246,7 +246,7 @@ The arrow in Figure~\ref{fig:tsr_asr_tradeoff} illustrates the 77 percentage poi
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig4_latency_overhead.pdf}
-\caption{\textbf{Latency Overhead.} \sys{} adds approximately 8s mean latency compared to no defense, primarily from provenance graph operations and policy evaluation.}
+\caption{\textbf{Latency Overhead by Defense System.} \sys{} adds approximately 8s mean latency compared to no defense (20.21s vs. 12.35s). Overhead breakdown: provenance graph (4.2s), policy evaluation (2.1s), LLM reasoning (1.7s).}
 \label{fig:latency_overhead}
 \end{figure}
 

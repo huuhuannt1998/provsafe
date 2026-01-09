@@ -1,0 +1,57 @@
+\documentclass[border=5pt]{standalone}
+\usepackage{tikz}
+\usepackage{xcolor}
+
+\definecolor{danger}{RGB}{220,53,69}
+\definecolor{warning}{RGB}{255,193,7}
+\definecolor{secondary}{RGB}{108,117,125}
+\definecolor{success}{RGB}{40,167,69}
+
+\begin{document}
+\begin{tikzpicture}[scale=1]
+  % Background grid
+  \draw[gray!20, very thin] (0,0) grid[xstep=2, ystep=1] (8,5);
+  
+  % Y-axis (Latency in seconds)
+  \draw[thick, ->] (0,0) -- (0,5.5) node[above, font=\small\bfseries] {Mean Latency (s)};
+  \foreach \y/\label in {0/0, 1/5, 2/10, 3/15, 4/20, 5/25} {
+    \draw[thick] (-0.1,\y) -- (0.1,\y);
+    \node[left, font=\footnotesize] at (-0.15,\y) {\label};
+  }
+  
+  % X-axis
+  \draw[thick] (0,0) -- (8.5,0);
+  
+  % Bar positions and widths
+  \def\barwidth{1.4}
+  
+  % No Defense: 12.35s -> 12.35/5 = 2.47
+  \fill[danger!70] (1-\barwidth/2, 0) rectangle (1+\barwidth/2, 2.47);
+  \node[below, font=\footnotesize, align=center] at (1, -0.3) {No\\Defense};
+  \node[above, font=\footnotesize\bfseries] at (1, 2.47) {12.35s};
+  
+  % Pattern Filter: 7.12s -> 7.12/5 = 1.42
+  \fill[warning!70] (3-\barwidth/2, 0) rectangle (3+\barwidth/2, 1.42);
+  \node[below, font=\footnotesize, align=center] at (3, -0.3) {Pattern\\Filter};
+  \node[above, font=\footnotesize\bfseries] at (3, 1.42) {7.12s};
+  
+  % Policy-Only: 11.94s -> 11.94/5 = 2.39
+  \fill[secondary!70] (5-\barwidth/2, 0) rectangle (5+\barwidth/2, 2.39);
+  \node[below, font=\footnotesize, align=center] at (5, -0.3) {Policy\\Only};
+  \node[above, font=\footnotesize\bfseries] at (5, 2.39) {11.94s};
+  
+  % PROVSAFE: 20.21s -> 20.21/5 = 4.04
+  \fill[success!70] (7-\barwidth/2, 0) rectangle (7+\barwidth/2, 4.04);
+  \node[below, font=\footnotesize, align=center] at (7, -0.3) {\textbf{PROVSAFE}};
+  \node[above, font=\footnotesize\bfseries] at (7, 4.04) {20.21s};
+  
+  % Overhead annotation
+  \draw[thick, <->, >=stealth] (1+\barwidth/2+0.1, 2.47) -- (1+\barwidth/2+0.1, 4.04);
+  \node[right, font=\tiny, align=left] at (1+\barwidth/2+0.15, 3.25) {+8s\\overhead};
+  
+  % Breakdown annotation
+  \node[draw, rounded corners, fill=white, font=\tiny, align=left] 
+    at (6.8, 2) {Provenance: 4.2s\\Policy eval: 2.1s\\LLM reasoning: 1.7s};
+  
+\end{tikzpicture}
+\end{document}
