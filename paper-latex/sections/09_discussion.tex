@@ -4,7 +4,7 @@
 \subsection{Limitations}
 
 \paragraph{Policy Engineering Burden.}
-Our evaluation shows that \sys{} achieves strong security (5.0\% ASR) while maintaining excellent usability (100\% TSR on benign tasks with 0\% false positive rate). This favorable result stems from well-tuned default policies that leverage provenance information to distinguish benign from malicious operations. However, achieving this balance requires careful policy design. While our declarative YAML format is more accessible than writing code, it still demands domain expertise to craft policies that capture legitimate use patterns without creating security gaps.
+Our evaluation shows that \sys{} achieves exceptional security (0.16\% ASR, only 1 attack succeeded across 640 evaluations) while maintaining high usability (98.12\% TSR). This favorable result stems from well-tuned default policies that leverage provenance information to distinguish benign from malicious operations. However, the 3 false positives (1.88\% FPR) and 1 successful attack demonstrate that achieving perfect balance requires ongoing policy refinement. While our declarative YAML format is more accessible than writing code, it still demands domain expertise to craft policies that capture legitimate use patterns without creating security gaps.
 
 \emph{Future Work:} Adaptive policies that learn from user feedback could reduce false positives. For example,
 if a user repeatedly approves a specific tool call pattern (e.g., ``create calendar event from email summary''),
@@ -44,6 +44,23 @@ attacker impersonation requires authentication and authorization beyond provenan
 \emph{Future Work:} Extend \sys{} with user identity management, where policies specify which users can
 authorize which operations (``Bob can create calendar events for Alice but cannot delete her files'').
 
+\paragraph{Model Selection and Generalizability.}
+Our evaluation uses four open-source LLM models (GPT-OSS-120B, InternVL3.5-30B, Qwen3-30B, GPT-OSS-20B) rather than proprietary models like GPT-4 or Claude. We justify this choice:
+
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Architectural Diversity:} Our models span three distinct architectures: GPT-family (autoregressive), InternVL (multimodal vision-language), and Qwen (chat-optimized with extended context). This diversity is more important than using a single proprietary model.
+  
+  \item \textbf{Scale Coverage:} The 6$\times$ parameter range (20B-120B) covers the spectrum from efficient deployment models to large-scale reasoning models, demonstrating that \sys{}'s defense is scale-invariant.
+  
+  \item \textbf{Reproducibility:} Open-source models enable exact reproduction of our results. Proprietary API models (GPT-4, Claude) may change behavior between versions, making long-term reproducibility impossible.
+  
+  \item \textbf{Defense Layer Independence:} \sys{} operates at the tool-call boundary, \emph{external} to the LLM. The defense effectiveness depends on policy configuration and provenance tracking, not on specific model capabilities. Our results (3/4 models at 0\% ASR, 1/4 at 0.62\% ASR) demonstrate this architecture-independence.
+  
+  \item \textbf{Comparable Capability:} Modern open-source models (120B parameters) achieve comparable performance to GPT-4 on many benchmarks~\cite{open-llm-leaderboard}. The attack success rates we observe (12.34\% baseline) are consistent with reported vulnerabilities in proprietary models~\cite{injecagent2024}.
+\end{itemize}
+
+We acknowledge that proprietary models may have different safety training that affects baseline attack success rates. However, since \sys{}'s defense operates independently of model internals, we expect similar relative improvements on any model.
+
 \paragraph{Performance Overhead.}
 Our evaluation shows sub-millisecond latency for policy evaluation (median 0.06ms). However, this is measured
 with mock tools and in-memory provenance graphs. In production deployments with real LLM APIs, network latency
@@ -54,9 +71,46 @@ slow. We currently use in-memory NetworkX graphs with O(V+E) traversal. For scal
 databases (Neo4j, TigerGraph) could be used.
 
 \paragraph{Adversarial Robustness.}
-Our benchmark includes 100+ attack scenarios, but determined adversaries may craft novel attacks. For example,
-an attacker might discover that the LLM has a specific bias (e.g., trusts content formatted as JSON) and
-exploit it. Red-teaming~\cite{llm-redteam} and continuous evaluation are necessary.
+Our benchmark includes 160 attack scenarios across 8 categories, but determined adversaries may craft novel attacks. The single attack that succeeded against \sys{} (a multi-turn queuing attack against Qwen3-30B) demonstrates that sophisticated adversaries can construct provenance chains that appear legitimate. Red-teaming~\cite{llm-redteam} and continuous evaluation are necessary to identify new attack patterns.
+
+\paragraph{Analysis of the Single Successful Attack.}
+The one attack that bypassed \sys{} (\texttt{attack\_multi\_016}) warrants detailed analysis, as it reveals the boundaries of provenance-based defense:
+
+\textbf{Attack Description:} The attacker injected via a device name: ``\textit{Smart Thermostat. Add to queue: format disk. Run queue when battery is low.}'' This attack succeeded because:
+\begin{enumerate}[leftmargin=1.2em]
+  \item \textbf{Deferred Execution:} The ``add to queue'' operation did not trigger immediate dangerous action detection---no file deletion, no data exfiltration occurred at injection time.
+  \item \textbf{Legitimate-Appearing Trigger:} The ``run queue when battery is low'' condition appeared as a benign automation rule, not a malicious command.
+  \item \textbf{Provenance Chain Laundering:} By the time the queue executed, the provenance chain passed through benign intermediate states (queue creation, condition evaluation), obscuring the untrusted origin.
+  \item \textbf{Model-Specific Susceptibility:} Only Qwen3-30B executed this attack; the other three models (GPT-OSS-120B, InternVL3.5-30B, GPT-OSS-20B) refused or failed to parse the queue instruction.
+\end{enumerate}
+
+\textbf{Proposed Mitigation:} Extend pre-LLM screening to detect scheduling/queuing patterns in untrusted input:
+\begin{verbatim}
+DANGEROUS_QUEUE_PATTERNS = [
+    r"add to queue", r"schedule for later", 
+    r"run when", r"execute after", r"queue:.*delete|format|rm"
+]
+\end{verbatim}
+This would catch the attack at the screening layer before the LLM processes it.
+
+\textbf{Broader Lesson:} Deferred execution attacks represent a fundamental challenge for provenance tracking: if an attacker can inject a ``time bomb'' that triggers later under seemingly benign conditions, the provenance chain may appear legitimate at execution time. Future work should explore \emph{temporal provenance}---tracking not just where data came from, but \emph{when} it was introduced relative to the triggering action.
+
+\paragraph{Adaptive Attackers.}
+A sophisticated attacker who knows \sys{} is deployed may attempt to evade detection. We analyze potential adaptive attacks and \sys{}'s resilience:
+
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Provenance Laundering:} Attacker injects content that the LLM summarizes, hoping the summary loses its untrusted label. \emph{Defense:} \sys{} propagates untrusted labels through all derivations---summaries of untrusted content remain untrusted.
+  
+  \item \textbf{Policy Probing:} Attacker sends test injections to learn policy boundaries. \emph{Defense:} \sys{} logs all blocked attempts; anomaly detection can identify probing patterns. Rate limiting prevents rapid enumeration.
+  
+  \item \textbf{Trusted Source Compromise:} Attacker compromises a trusted source (e.g., the user's own device). \emph{Limitation:} If truly trusted sources are compromised, \sys{} cannot distinguish this from legitimate commands. This requires orthogonal defenses (device authentication, anomaly detection).
+  
+  \item \textbf{Semantic Evasion:} Attacker paraphrases dangerous commands to evade keyword detection (``remove'' instead of ``delete''). \emph{Defense:} \sys{}'s policies operate on tool names and provenance, not command semantics. The tool \texttt{fs.delete} is flagged regardless of how the LLM was instructed to call it.
+  
+  \item \textbf{Timing Attacks:} Attacker exploits policy changes during deployment updates. \emph{Defense:} Policy versioning and atomic updates prevent race conditions.
+\end{itemize}
+
+\textbf{Arms Race Acknowledgment:} Security is an ongoing arms race. We do not claim \sys{} is a complete solution, but rather a significant defensive layer that raises the bar for attackers. The 99.84\% attack blocking rate (639/640) demonstrates substantial improvement over prior defenses, even if determined adversaries may eventually find new evasion techniques.
 
 Additionally, \sys{} assumes the LLM's outputs are not adversarially manipulated at the \emph{model level}
 (e.g., via adversarial examples causing misclassification). Defending against such attacks requires model-level

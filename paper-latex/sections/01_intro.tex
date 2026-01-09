@@ -97,16 +97,16 @@ traces back to untrusted sources, policies can require confirmation or additiona
 blind execution of attacker-controlled commands.
 
 \textbf{Evaluation and Results.}
-We implement \sys{} as an open-source Python framework and evaluate it against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) on a benchmark suite of 160 attack scenarios and 40 benign tasks spanning 8 attack categories, deployed across four diverse LLM agent models (GPT-OSS-120B, InternVL3.5-30B-A3B, Qwen3-30B-A3B, GPT-OSS-20B). Our evaluation demonstrates:
+We implement \sys{} as an open-source Python framework and evaluate it against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) on a benchmark suite of 160 attack scenarios and 40 benign tasks spanning 8 attack categories, deployed across four diverse LLM agent models (GPT-OSS-120B, InternVL3.5-30B-A3B, Qwen3-30B-A3B, GPT-OSS-20B). Our evaluation comprises 3,200 total evaluations (200 scenarios $\times$ 4 models $\times$ 4 systems) and demonstrates:
 
 \begin{itemize}[leftmargin=1.2em]
-  \item \textbf{Near-complete attack mitigation:} \sys{} achieves \textbf{5.0\% ASR} across all four LLM agent models, blocking 95\% of prompt injection attempts across all categories (direct injection, indirect injection, encoding obfuscation, jailbreaks, confused deputy). This represents a \textbf{95 percentage point improvement} over undefended systems (100\% ASR) and \textbf{40 pp improvement} over state-of-the-art pattern filtering (45\% ASR).
+  \item \textbf{Near-complete attack mitigation:} \sys{} achieves \textbf{0.16\% ASR} (only 1 attack succeeded across 640 evaluations), blocking 99.84\% of prompt injection attempts. This represents a \textbf{98.7\% reduction} from the 12.34\% baseline ASR. Three of four LLM models achieve perfect 0\% ASR; the single successful attack exploited a sophisticated multi-turn queuing pattern against Qwen3-30B.
   
-  \item \textbf{Provenance is the critical component:} Ablation studies reveal that provenance tracking contributes \textbf{20.9 pp ASR reduction} beyond policy-only defense (25.9\% $\rightarrow$ 5.0\% ASR). This validates our core insight: security requires knowing \emph{where information came from}, not just \emph{what it says}.
+  \item \textbf{Provenance enables usability, not just security:} Our ablation study reveals a surprising finding: policy-only defense achieves 0\% ASR (perfect security) but only \textbf{21.25\% TSR}---rendering the agent nearly unusable. Provenance tracking restores usability to \textbf{98.12\% TSR} while maintaining near-zero ASR. This validates our core insight: security \emph{and} usability require knowing where information came from.
   
-  \item \textbf{Optimal usability-security balance:} \sys{} achieves \textbf{100\% task success rate} on benign operations with \textbf{0\% false positive rate}---the only system achieving both strong security and complete usability. The remaining 5\% attack success represents sophisticated multi-step attacks that appear legitimate through careful provenance chain construction.
+  \item \textbf{Optimal security-usability balance:} \sys{} is the \textbf{only system} achieving both high security (0.16\% ASR) and high usability (98.12\% TSR). All other defense configurations sacrifice one for the other.
   
-  \item \textbf{Comprehensive comparative evaluation:} We evaluate against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) across 3,200 evaluations (200 scenarios $\times$ 4 models $\times$ 4 systems), demonstrating consistent results across diverse LLM architectures (20B-120B parameters).
+  \item \textbf{Cross-model robustness:} Results are consistent across four LLM models spanning a 6$\times$ parameter range (20B-120B). Attack categories with highest baseline risk---encoding obfuscation (47.2\% ASR) and role-play jailbreaks (27.5\% ASR)---are completely blocked by \sys{}.
 \end{itemize}
 
 Compared to prior work, \sys{} is the first system to:
@@ -140,8 +140,7 @@ Compared to prior work, \sys{} is the first system to:
         injection attacks into 8 categories and construct a benchmark of 160 attack scenarios and 40 benign tasks including: direct injection, indirect injection via 5 vectors (device names, notifications, files, calendar, location metadata), multi-turn chaining, encoding obfuscation (Base64, URL, Unicode), role-play jailbreaks, confused deputy, and privilege escalation attacks. Each scenario includes setup, expected behavior, and success criteria.
   
   \item \textbf{Rigorous Empirical Evaluation:} We conduct: (i)~comparative evaluation against 4
-        baselines showing 95 pp ASR reduction (100\% $\rightarrow$ 5\%), (ii)~ablation studies quantifying each component's
-        contribution (provenance: +20.9 pp), (iii)~cross-model validation across four LLM models (20B-120B parameters) with consistent results (5\% ASR, 100\% TSR), and (iv)~usability analysis demonstrating 0\% false positive rate with sub-2s total latency overhead.
+        baselines showing 98.7\% ASR reduction (12.34\% $\rightarrow$ 0.16\%), (ii)~ablation studies demonstrating provenance is essential for usability (policy-only: 0\% ASR but 21.25\% TSR; full \sys{}: 0.16\% ASR with 98.12\% TSR), (iii)~cross-model validation across four LLM models (20B-120B parameters) with 3/4 achieving 0\% ASR, and (iv)~per-category analysis showing complete blocking of encoding obfuscation and role-play jailbreaks.
   
   \item \textbf{Open-Source Artifact:} We release the complete \sys{} implementation (5,000+ LOC),
         policy examples, benchmark suites, evaluation scripts, and deterministic replay tools. All

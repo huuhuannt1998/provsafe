@@ -10,19 +10,17 @@ context about the provenance of tool calls.
 We presented \sys{}, a defense framework combining \emph{provenance-based trust tracking} with
 \emph{capability-based policy enforcement}. By maintaining a directed acyclic graph linking derived facts
 to their source inputs, \sys{} enables policies that distinguish between tool calls originating from
-trusted user commands and those originating from attacker-controlled content. Our evaluation demonstrates
-that \sys{} reduces attack success rate to 0\% on a comprehensive benchmark suite (compared to 90.9\%
-for undefended systems), with ablation studies confirming that provenance tracking is the most critical
-component (contributing 24.3 percentage points of ASR reduction).
+trusted user commands and those originating from attacker-controlled content. Our evaluation across 3,200 evaluations (200 scenarios $\times$ 4 models $\times$ 4 systems) demonstrates
+that \sys{} achieves \textbf{0.16\% ASR}---blocking 639 of 640 attacks---while maintaining \textbf{98.12\% TSR} on benign tasks. This represents a 98.7\% reduction from the 12.34\% baseline ASR.
+
+Critically, our ablation study reveals that provenance tracking is essential \emph{for usability}, not just security: policy-only defense (without provenance) achieves 0\% ASR but only 21.25\% TSR, rendering the agent nearly unusable. Provenance enables the precision required to allow legitimate operations while blocking attacks.
 
 The \sys{} architecture---a policy engine, provenance tracker, and enforcement proxy---is language-agnostic,
-deployable without modifying the LLM, and incurs negligible latency overhead (<0.1ms per decision). Our
+deployable without modifying the LLM, and adds approximately 8 seconds mean latency (acceptable for smart home applications). Our
 declarative YAML policy language enables system administrators to express complex constraints (risk tiers,
 scope restrictions, temporal rules, rate limits, evidence requirements) without writing code.
 
-While \sys{} demonstrates strong security, our evaluation also revealed usability trade-offs: the default
-policies prioritize security, resulting in a 37.5\% false positive rate on benign tasks. This highlights
-the need for careful policy tuning and future research on adaptive policies that learn from user feedback.
+\sys{} demonstrates that the security-usability trade-off is not inherent---with proper provenance tracking, it is possible to achieve both high security (0.16\% ASR) and high usability (98.12\% TSR). The single successful attack (a multi-turn queuing pattern against Qwen3-30B) and three false positives (1.88\% FPR) identify specific edge cases for future policy refinement.
 
 Beyond smart homes, \sys{}'s principles apply broadly to any LLM agent interacting with untrusted content:
 enterprise assistants processing emails, healthcare agents accessing patient records, web browsing agents
@@ -30,21 +28,18 @@ reading untrusted web pages, and physical robots interpreting sensor data. Prove
 sandboxing provides a principled foundation for building secure, trustworthy AI agents.
 
 We release \sys{} as an open-source artifact, including the policy engine, provenance tracker, enforcement
-proxy, comprehensive benchmark suite (100+ attack scenarios), evaluation framework, and deterministic replay
+proxy, comprehensive benchmark suite (200 scenarios across 8 attack categories), evaluation framework, and deterministic replay
 tools. We hope this work catalyzes further research on LLM agent security and contributes to the safe
 deployment of AI in real-world systems.
 
 \paragraph{Key Takeaways.}
 \begin{itemize}[leftmargin=1.2em]
-  \item \textbf{Provenance is critical} for defending against prompt injection: tracking data lineage
-        enables policies that deny tool calls derived from untrusted sources.
+  \item \textbf{Provenance enables both security AND usability}: Without provenance, policies must conservatively block operations (21.25\% TSR). With provenance, \sys{} achieves 98.12\% TSR while maintaining 0.16\% ASR.
+  \item \textbf{Defense-in-depth at the tool-call boundary} is more robust than prompt-level filtering,
+        achieving 0\% ASR on encoding obfuscation (vs. 47.2\% baseline) and role-play jailbreaks (vs. 27.5\% baseline).
+  \item \textbf{Cross-model consistency}: Three of four LLM models (20B-120B parameters) achieve perfect 0\% ASR, demonstrating that \sys{}'s defense is architecture-agnostic.
   \item \textbf{Policies must be composable and context-aware}, combining risk tiers, provenance, scope,
         temporal constraints, and evidence requirements.
-  \item \textbf{Defense-in-depth at the tool-call boundary} is more robust than prompt-level filtering,
-        as it is immune to encoding obfuscation and semantic evasion.
-  \item \textbf{Security-usability trade-offs are unavoidable}, but they can be managed via risk-based
-        confirmation (low-risk tools execute automatically, high-risk tools require approval) and
-        adaptive policies.
   \item \textbf{Reproducible benchmarks and open-source tools} are essential for advancing LLM agent
         security as a research field.
 \end{itemize}
