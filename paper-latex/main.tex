@@ -59,29 +59,11 @@
 \begin{document}
 
 \begin{abstract}
-Large language models (LLMs) are being rapidly deployed as autonomous agents capable of controlling
-smart home devices, managing files, and accessing sensitive data through natural language interfaces.
-However, these \emph{tool-using LLM agents} are fundamentally vulnerable to \emph{prompt injection attacks},
-where adversaries embed malicious instructions in external content---device names, calendar events, file
-contents---that the agent reads during task execution. When the LLM processes this attacker-controlled data
-alongside legitimate user commands, it cannot reliably distinguish instructions from data, leading to
-unauthorized tool invocations such as data exfiltration, file deletion, or privilege escalation.
+Tool-using LLM agents in smart homes are vulnerable to \emph{prompt injection}: adversaries embed malicious instructions in external content (device names, files, calendar events) that the agent processes alongside legitimate commands, causing unauthorized tool invocations. Existing defenses---pattern filtering, dual-LLM architectures, output validation---fail because security decisions cannot be made reliably at the prompt level.
 
-Existing defenses are inadequate: pattern-based filtering fails against semantic obfuscation and encoding
-attacks, dual-LLM architectures double inference cost while remaining vulnerable to sophisticated injections,
-and output validation lacks the context to distinguish benign from malicious tool calls. The fundamental
-challenge is that security decisions cannot be made reliably at the prompt level where LLMs operate.
+We present \sys{}, a provenance-verified capability sandboxing framework that enforces security at the \emph{tool-call boundary}. \sys{} maintains a directed acyclic graph tracking data provenance, labeling inputs as trusted (user commands) or untrusted (external sources). An enforcement proxy evaluates declarative policies combining capability restrictions, provenance constraints, scope limitations, temporal rules, and rate limits---enabling context-aware access control without relying on the LLM for security decisions.
 
-We present \sys{}, a provenance-verified capability sandboxing framework that enforces security at the
-\emph{tool-call boundary} rather than the prompt level. \sys{} maintains a directed acyclic graph tracking
-the provenance of every piece of information the agent processes, labeling data as trusted (from authenticated
-users) or untrusted (from external sources). When the agent proposes a tool call, \sys{}'s enforcement proxy
-evaluates declarative policies that combine capability restrictions (risk tiers, tool allowlists), provenance
-constraints (argument origins), scope limitations (path prefixes), temporal rules, and rate limits. Policies
-can express nuanced rules like ``DENY file deletion IF arguments trace to untrusted sources AND target user
-directories,'' enabling context-aware access control without relying on the LLM to make security decisions.
-
-We evaluate \sys{} on a comprehensive benchmark of 160 attack scenarios and 40 benign tasks spanning 8 attack categories (direct injection, indirect injection via multiple vectors, encoding obfuscation, role-play jailbreaks, multi-turn chaining, confused deputy, and privilege escalation), deployed across four diverse LLM agent models (20B-120B parameters). Our evaluation comprises 3,200 evaluations (200 scenarios $\times$ 4 models $\times$ 4 defense systems). \sys{} achieves \textbf{0.16\% attack success rate} (only 1 attack succeeded across 640 evaluations)---a \textbf{98.7\% reduction} from the 12.34\% baseline. Three of four models achieve perfect 0\% ASR. Critically, our ablation study reveals that provenance tracking is essential \emph{for usability}: policy-only defense achieves 0\% ASR but only 21.25\% task success rate---rendering the agent unusable. With provenance tracking, \sys{} achieves \textbf{98.12\% task success rate} while maintaining near-zero ASR, demonstrating that provenance enables precision without sacrificing usability. Attack categories with highest baseline risk---encoding obfuscation (47.2\% ASR) and role-play jailbreaks (27.5\% ASR)---are completely blocked by \sys{}. We release \sys{} as open-source software with complete benchmark suites and reproducible evaluation tools.
+We evaluate \sys{} on 200 scenarios (160 attacks across 8 categories, 40 benign tasks) with five LLM models (20B--120B parameters, four architectures), totaling 3,200 evaluations. \sys{} achieves \textbf{0.16\% attack success rate} (1/640 attacks)---a \textbf{98.7\% reduction} from the 12.34\% baseline---with \textbf{98.12\% task success rate}. Four of five models achieve 0\% ASR. Our ablation reveals provenance is essential \emph{for usability}: policy-only defense achieves 0\% ASR but only 21.25\% TSR. An independent oracle (not used as agent) confirms 95\% ground-truth agreement, and embedding-enhanced provenance eliminates the paraphrase evasion vulnerability entirely (ASR 23.3\% $\to$ 0.0\%). We release \sys{} as open-source software.
 \end{abstract}
 
 \keywords{Smart Homes; LLM Agents; Prompt Injection; Provenance; Capability Security; Policy Enforcement}

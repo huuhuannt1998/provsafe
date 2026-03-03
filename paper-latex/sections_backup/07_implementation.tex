@@ -1,0 +1,95 @@
+\section{Implementation}
+\label{sec:impl}
+
+We implement \sys{} as an open-source Python framework comprising 5,000+ lines of well-structured code across five major components: a policy engine, provenance tracker, enforcement proxy, comprehensive benchmark suite, and evaluation framework. This section details the implementation architecture, tool abstractions, and evaluation infrastructure that enables reproducible and rigorous security assessment.
+
+\subsection{System Architecture}
+
+\sys{} is structured modularly to separate concerns and enable extensibility. The \textbf{policy engine} (\texttt{provsafe/policy/}) implements Algorithm~\ref{alg:policy}. YAML policy files are parsed and validated against a Pydantic schema at startup, then compiled into an efficient in-memory representation (decision trees and lookup tables) for fast evaluation. The evaluation engine implements the core logic with optimizations: rule indexing by tool name enables O(1) rule lookup, condition evaluation short-circuits on first failure, and a sliding-window rate limiter with in-memory counters tracks call frequencies. The constraint library is pluggable—new condition types can be added via Python functions without modifying core logic.
+
+The \textbf{provenance tracker} (\texttt{provsafe/provenance/}) maintains the information flow graph. Internally, it uses NetworkX, a mature Python graph library, to represent the DAG with node attributes (type, content, trust label, SHA-256 hash, timestamp). Trust propagation is computed on-demand via breadth-first search over ancestor edges; provenance queries (``get\_sources,'' ``is\_trusted,'' ``get\_untrusted\_sources'') traverse the graph lazily. String matching for argument-to-node mapping is accelerated via an inverted index: substrings are pre-indexed and stored in a hash map for O(1) amortized lookup. Graphs are serialized to JSON for audit logging, replay, and forensic analysis.
+
+The \textbf{enforcement proxy} (\texttt{provsafe/proxy/}) implements the seven-stage workflow described in Section~\ref{sec:proxy}. The proxy includes three defense layers: (1) \emph{pre-LLM input screening} that detects jailbreak attempts, multi-turn chaining patterns, and encoding obfuscation before the LLM is invoked; (2) \emph{argument validation} that inspects tool arguments for Base64, hexadecimal, ROT13, and Unicode encoding, path traversal attempts, and command injection patterns; and (3) \emph{policy evaluation} with dangerous action blocking for inherently risky operations. Tool call requests and policy decisions are modeled as Pydantic dataclasses, providing type safety and automatic schema validation. The confirmation interface is CLI-based (using the \texttt{inquirer} library for terminal UI) but extensible to web or GUI backends via plugins. Decision logging is appended to a JSON file with SHA-256 hashing for integrity.
+
+The \textbf{benchmark suite} (\texttt{provsafe/bench/}) contains 40 benign tasks and 160 attack scenarios across 8 categories. Tasks are specified in YAML with setup steps, user commands, expected tool calls, and success criteria. Mock tool implementations are deterministic (using seeded RNGs with default seed 42) to ensure reproducibility. The evaluation runner executes tasks, collects metrics (TSR, ASR, UAR, confirmation burden, latency), and generates detailed reports.
+
+The \textbf{evaluation framework} (\texttt{provsafe/eval/}) orchestrates comparative evaluation, ablation studies, and statistical analysis. It runs multiple baselines on the same task suite, records results in a results database, and generates human-readable reports with tables and figures. An ablation runner disables system components one at a time to measure their individual contributions to security. A statistical analyzer runs 30 trials with different random seeds, computes confidence intervals and effect sizes, and outputs a final summary.
+
+\subsection{Mock Tool Implementations}
+
+\sys{} provides deterministic implementations of 15 common smart home tools across five categories, enabling controlled evaluation without relying on actual external services or cloud APIs. File System operations include \texttt{fs.read(path)}, \texttt{fs.write(path, content)}, \texttt{fs.delete(path)}, and \texttt{fs.list(path)}, all backed by an in-memory filesystem representation (not real disk I/O). Calendar operations include \texttt{calendar.list\_events(date)}, \texttt{calendar.create\_event(title, time)}, and \texttt{calendar.delete\_event(id)}, with events stored in memory. Notifications include \texttt{notify.send(message)} and \texttt{notify.list()}, with notifications immutable once sent. Email operations include \texttt{email.send(to, subject, body)} and \texttt{email.list()}, with validation of email addresses. Device operations include \texttt{device.list()} (the primary injection vector), \texttt{device.set\_state(name, state)}, and \texttt{device.set\_name(name)} (used only in attack setup). All tools use a centralized RNG seeded at evaluation start (default seed 42), ensuring reproducibility across runs.
+
+\subsection{Policy Configuration}
+
+We provide three policy configurations with different security-usability trade-offs. The \textbf{default policy} (\texttt{provsafe.yaml}) balances security and usability, allowing LOW-risk read-only operations within safe scopes, requiring confirmation for HIGH-risk operations with untrusted provenance, denying CRITICAL operations, and enforcing rate limits and temporal constraints. This is the policy used for \sys{} (Full) in our evaluation, achieving 0.16\% ASR and 98.12\% TSR. The \textbf{permissive policy} (\texttt{permissive.yaml}) minimizes friction, achieving high TSR but providing minimal defense (equivalent to the No Defense baseline). The \textbf{strict policy} (\texttt{strict.yaml}) maximizes security, requiring confirmation for all MEDIUM+ operations and denying all untrusted provenance; this approximates the Policy-Only baseline, achieving near-0\% ASR but only ~21\% TSR due to aggressive blocking.
+
+\subsection{Attack Scenario Design}
+
+The benchmark comprises 160 attack scenarios across 8 categories. \textbf{Direct Injection} (20 scenarios) provides crafted compound commands to trick the agent. \textbf{Device Name Injection} (22 scenarios) embeds malicious instructions in device names. \textbf{File Content Injection} (22 scenarios) creates files with malicious content. \textbf{Multi-Turn Chaining} (20 scenarios) injects across multiple conversation turns. \textbf{Encoding Obfuscation} (18 scenarios) uses Base64, URL, hexadecimal, ROT13, or Unicode encoding. \textbf{Role-Play Jailbreak} (20 scenarios) exploits fictional scenario frames and DAN-style prompts. \textbf{Confused Deputy} (18 scenarios) leverages capability confusion. \textbf{Privilege Escalation} (20 scenarios) attempts to gain unauthorized access through progressive requests. Additionally, we include 40 benign tasks for usability evaluation. Each scenario specifies setup, user command, expected tool calls, and success criteria.
+
+\subsection{Tool Abstraction and Registration}
+
+\sys{} defines a uniform tool interface that abstracts over heterogeneous backends. Each tool is registered with: (a) a unique name (e.g., \texttt{fs.delete}), (b) a risk tier (\texttt{LOW}, \texttt{MEDIUM}, \texttt{HIGH}, \texttt{CRITICAL}), (c) a typed parameter schema (Pydantic model), and (d) an optional scope specification (e.g., allowed path prefixes). Registration is declarative:
+
+\begin{verbatim}
+@provsafe.register(
+    name="fs.delete", risk=HIGH,
+    params={"path": str},
+    scope={"path": ["/tmp/*", "/home/*/trash/*"]})
+def delete_file(path: str) -> bool: ...
+\end{verbatim}
+
+At startup, \sys{} compiles all registrations into a tool catalog indexed by name, enabling O(1) dispatch. The risk tier assignment follows a conservative default: tools that modify or delete state are \texttt{HIGH} or \texttt{CRITICAL}; read-only tools are \texttt{LOW}; tools that send data externally (email, notifications) are \texttt{MEDIUM}. Operators can override defaults via YAML configuration.
+
+\subsection{Provenance Resolution}
+
+A critical implementation challenge is \emph{provenance resolution}: given a tool-call argument (e.g., the path \texttt{"/home/user/backups"}), determining which provenance graph node(s) it originated from. We implement a three-stage resolution pipeline:
+
+\textbf{Stage 1: Exact Match.} Check whether the argument string appears verbatim in any provenance node's content field. This handles the common case where the LLM passes through data without modification.
+
+\textbf{Stage 2: Substring Match with Inverted Index.} For each provenance node, we pre-compute an inverted index of $n$-grams (default $n=4$). When an argument arrives, we extract its $n$-grams and query the index. If a provenance node shares $\geq$60\% of the argument's $n$-grams, we consider it a match. The inverted index provides O(1) amortized lookup per $n$-gram, making resolution efficient even with large provenance graphs.
+
+\textbf{Stage 3: Conservative Default.} If no match is found in Stages 1--2, the argument is treated as \emph{unresolved}. Unresolved arguments are handled according to policy configuration: the default policy treats them as untrusted (conservative), requiring confirmation for \texttt{HIGH}-risk tools. This ensures that failed resolution degrades to safe behavior, not to undefended execution.
+
+\textbf{Limitations.} This pipeline relies on lexical overlap and does not handle semantic paraphrasing (see Section~\ref{sec:discussion}). On our standard benchmark (explicit string injection), Stages 1--2 successfully resolved provenance for 95\% of attack scenarios; the remaining 5\% were caught by other defense layers (pre-LLM screening, argument validation). Against adaptive paraphrase attacks, provenance recall drops to 65\% overall (Section~\ref{subsec:paraphrase}).
+
+\subsection{Lines of Code}
+
+Table~\ref{tab:loc} shows the code breakdown by component.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Lines of code by component.}
+\label{tab:loc}
+\begin{tabular}{lr}
+\toprule
+\textbf{Component} & \textbf{LOC} \\
+\midrule
+Policy engine (\texttt{policy/}) & 820 \\
+Provenance tracker (\texttt{provenance/}) & 650 \\
+Enforcement proxy (\texttt{proxy/}) & 1,100 \\
+Tool abstractions \& mock tools & 480 \\
+Benchmark suite (200 scenarios) & 1,200 \\
+Evaluation framework & 750 \\
+\midrule
+\textbf{Total} & \textbf{5,000+} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Infrastructure}
+
+The evaluation framework automates comparative assessment, ablation analysis, and verification. A Comparative Evaluator runs four systems (No Defense, Pattern Filter, Policy-Only, PROVSAFE Full) on the same task suite and outputs results tables. An Ablation Study measures individual component contributions. Results are deterministic via controlled randomization (seed 42).
+
+\subsection{Performance Characteristics}
+
+\textbf{Proxy Decision Latency.} The enforcement proxy adds sub-millisecond overhead per tool call: policy evaluation completes in median 0.06ms (p95: 0.10ms), provenance graph queries in median 0.82ms (p95: 2.31ms), and argument validation in median 0.15ms. Total proxy decision time is $<$1ms per tool call.
+
+\textbf{End-to-End Task Runtime.} In our evaluation (Section~\ref{sec:eval}), total task runtime averages 20.21s for \sys{} vs. 12.35s for the undefended baseline. The $\sim$8s difference is dominated by user confirmation delays (when REQUIRE\_CONFIRMATION policies trigger) and LLM re-prompting after blocked tool calls---not by proxy computation. Tasks that trigger no confirmations show near-zero overhead.
+
+\textbf{Memory Usage.} Memory footprint is modest: $\sim$5~MB for compiled policies, $\sim$50~MB for provenance graphs with 1,000 nodes. For long-running conversations, periodic pruning of old nodes (configurable retention, default 7 days) prevents unbounded growth.
+
+\subsection{Deployment and Open-Source Release}
+
+Installation is straightforward: \texttt{pip install provsafe}. Integration requires one-line decorator or function wrapper. Policies are customizable YAML. System supports embedded (Python decorator), server-based (HTTP/gRPC), or auditing-only deployment. Code is released open-source at \texttt{github.com/huuhuannt1998/provsafe} with complete documentation, three policy examples, 200-scenario benchmark suite, evaluation scripts, and reproducible evaluation tools.

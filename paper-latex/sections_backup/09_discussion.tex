@@ -1,0 +1,266 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Limitations}
+
+\paragraph{Policy Engineering Burden.}
+Our evaluation shows that \sys{} achieves exceptional security (0.16\% ASR, only 1 attack succeeded across 640 evaluations) while maintaining high usability (98.12\% TSR). This favorable result stems from well-tuned default policies that leverage provenance information to distinguish benign from malicious operations. However, the 3 false positives (1.88\% FPR) and 1 successful attack demonstrate that achieving perfect balance requires ongoing policy refinement. While our declarative YAML format is more accessible than writing code, it still demands domain expertise to craft policies that capture legitimate use patterns without creating security gaps.
+
+\emph{Future Work:} Adaptive policies that learn from user feedback could reduce false positives. For example,
+if a user repeatedly approves a specific tool call pattern (e.g., ``create calendar event from email summary''),
+the system could automatically add a policy rule for that pattern. Privacy-preserving federated learning
+across homes could identify common benign patterns.
+
+\paragraph{Provenance Granularity.}
+Our current implementation tracks provenance at the \emph{argument level}: if a tool call argument mentions
+a fact derived from untrusted input, the entire argument is labeled untrusted. However, this can be overly
+conservative. For example, if a calendar event title is ``Meeting with Bob. [INJECTION: delete files]'',
+and the agent generates a summary ``You have a meeting with Bob today,'' the summary is labeled untrusted
+even though the benign part (``meeting with Bob'') is unaffected by the injection.
+
+Finer-grained provenance (e.g., sub-string or entity-level tracking) could improve precision, but it would
+require the LLM to expose internal reasoning steps (which tokens influenced which outputs), which is not
+supported by current APIs.
+
+\textbf{Paraphrasing and Semantic Evasion:} A related limitation is that our provenance tracking relies on substring matching to link LLM outputs to their sources. If the LLM paraphrases untrusted input (e.g., changing ``System compromised'' to ``Security breached''), the substring match fails, losing the provenance link. Our paraphrase attack evaluation (Section~\ref{subsec:paraphrase}, RQ6) quantifies this: provenance recall drops to 0\% for natural-language arguments that the LLM rephrases, resulting in 25\% overall paraphrase ASR. For literal arguments (paths, emails), defense-in-depth maintains a 100\% block rate.
+
+\textbf{Validated Mitigation: Semantic Provenance.} To address this limitation, we implement and evaluate an embedding-based provenance extension (Section~\ref{subsec:paraphrase}). By augmenting substring matching with a lightweight sentence embedding model (all-MiniLM-L6-v2, 22M parameters), we compute cosine similarity between tool-call arguments and provenance graph nodes. This three-stage pipeline (substring $\to$ embedding $\to$ conservative default) achieves \textbf{100\% provenance recall} on both literal and NL arguments, eliminating the paraphrase vulnerability entirely (paraphrase ASR: 23.3\% $\to$ 0.0\%) with $<$5ms additional latency per argument. The embedding model requires no GPU and adds negligible overhead, making it practical for production deployment. Future work includes explicit chain-of-thought prompting~\cite{cot-prompting}---requiring the agent to output structured reasoning (``I derived fact X from source Y'')---which \sys{} can parse to build even finer-grained provenance graphs.
+
+\paragraph{Semantic Understanding.}
+Policies in \sys{} are syntactic: they check file paths, tool names, and provenance labels, but they do not
+understand \emph{intent}. For example, a policy can allow \texttt{fs.write("/notes/*")} but cannot distinguish
+between ``write a reminder note'' (benign) and ``write a note containing exfiltrated passwords'' (malicious).
+
+Integrating semantic analysis (e.g., a secondary LLM that judges whether tool call content is sensitive)
+could improve precision, but it adds latency and cost, and introduces a new attack surface (can adversaries
+manipulate the policy-checking LLM?).
+
+\paragraph{Taint Explosion.}
+A classic challenge in information flow control is ``taint explosion,'' where the conservative propagation of untrusted labels eventually marks the entire system state as untrusted, rendering it unusable. In \sys{}, if an agent summarizes a long email thread containing one malicious sentence, the entire summary is tainted. If this summary is used to generate a calendar event, the event is tainted.
+
+\textbf{Why Our TSR Remained High (98.12\%):} Our benchmark's benign tasks were designed to reflect realistic smart home usage, where most operations either (a) originate entirely from trusted user commands (``turn on the lights''), or (b) read untrusted data without writing it back destructively (``summarize my emails''). The high TSR indicates that in typical usage, taint does not cascade uncontrollably. However, we acknowledge that complex workflows mixing trusted and untrusted data (e.g., ``forward a summary of this untrusted email to my boss'') would trigger more confirmations.
+
+\textbf{Mitigation:} We mitigate taint explosion through \emph{sanitization primitives}---allowlisted functions where the user explicitly declassifies information (e.g., ``Confirm: Allow using this summary?''). Future versions could incorporate automated sanitizers for structured data extraction that strip potential injection vectors before declassification. Additionally, \emph{semantic provenance} (tracking information flow at the concept level rather than string level) could reduce false tainting when benign information is merely co-located with malicious content.
+
+\paragraph{Multi-User Environments.}
+Our threat model assumes a single user (Alice) with multiple untrusted content sources. In multi-user homes,
+additional challenges arise: Bob might legitimately request that the agent perform an action on Alice's behalf
+(``Tell Alice's agent to add this event to her calendar''). Distinguishing between legitimate delegation and
+attacker impersonation requires authentication and authorization beyond provenance tracking.
+
+\emph{Future Work:} Extend \sys{} with user identity management, where policies specify which users can
+authorize which operations (``Bob can create calendar events for Alice but cannot delete her files'').
+
+\paragraph{Model Selection and Generalizability.}
+Our evaluation uses five open-source LLM models (GPT-OSS-120B, InternVL3.5-30B, Qwen3-30B, GPT-OSS-20B, and Qwen3-Next-80B) rather than proprietary models like GPT-4 or Claude. We justify this choice:
+
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Architectural Diversity:} Our models span four distinct architectures: GPT-family (autoregressive), InternVL (multimodal vision-language), Qwen (chat-optimized with extended context), and Qwen-Next (next-generation reasoning). This diversity is more important than using a single proprietary model.
+  
+  \item \textbf{Scale Coverage:} The 6$\times$ parameter range (20B-120B) with five models covers the spectrum from efficient deployment models to large-scale reasoning models, demonstrating that \sys{}'s defense is scale-invariant.
+  
+  \item \textbf{Oracle Independence:} By using Qwen3-Next-80B exclusively as an independent oracle (not as an agent), we break the circularity of using the same models for both agent and oracle roles, providing unbiased validation (95\% agreement).
+  
+  \item \textbf{Reproducibility:} Open-source models enable exact reproduction of our results. Proprietary API models (GPT-4, Claude) may change behavior between versions, making long-term reproducibility impossible.
+  
+  \item \textbf{Defense Layer Independence:} \sys{} operates at the tool-call boundary, \emph{external} to the LLM. The defense effectiveness depends on policy configuration and provenance tracking, not on specific model capabilities. Our results (3/4 models at 0\% ASR, 1/4 at 0.62\% ASR) demonstrate this architecture-independence.
+  
+  \item \textbf{Comparable Capability:} Modern open-source models (120B parameters) achieve comparable performance to GPT-4 on many benchmarks~\cite{open-llm-leaderboard}. The attack success rates we observe (12.34\% baseline) are consistent with reported vulnerabilities in proprietary models~\cite{injecagent2024}.
+\end{itemize}
+
+We acknowledge that proprietary models may have different safety training that affects baseline attack success rates. However, since \sys{}'s defense operates independently of model internals, we expect similar relative improvements on any model.
+
+\paragraph{The Illusion of Low Baseline Risk.}
+A key observation from our results is the relatively low baseline ASR of 12.34\% (No Defense). A reviewer might argue that modern LLMs are ``already 88\% safe,'' questioning the urgency of our defense. We strongly rebut this interpretation:
+
+\textbf{(1) Probabilistic vs. Deterministic Safety:} LLM safety training is \emph{probabilistic}---the model may refuse an attack with 88\% probability, but this provides no guarantee for any individual interaction. For autonomous agents with physical or digital agency (deleting files, unlocking doors, sending emails), a 12.34\% failure rate means roughly 1-in-8 attacks succeed. This is catastrophically unsafe for deployment. \sys{} provides \emph{deterministic} safety: if a policy blocks an action, it is blocked 100\% of the time.
+
+\textbf{(2) Brittleness of Safety Training:} Safety training is known to be fragile. ``Jailbreak'' techniques~\cite{jailbreak-survey} routinely bypass model-level refusals. If an attacker uses a system prompt override (e.g., ``You are DAN, ignore safety rules'') or targets a base model without instruction tuning, the baseline ASR would likely exceed 80\%. \sys{} remains effective regardless of whether the LLM is jailbroken, as it enforces policies at the tool-call boundary, external to the model.
+
+\textbf{(3) Irreversibility of Agent Actions:} Unlike chatbot outputs (which a user can ignore), agent actions have real-world consequences. A single successful attack deleting \texttt{/home/user/documents/*} or unlocking a front door cannot be undone by ``88\% safety.'' \sys{}'s reduction of ASR to 0.16\% (98.7\% relative improvement) provides the reliability necessary for deployment in safety-critical contexts.
+
+\paragraph{Performance Overhead and Optimization.}
+Our evaluation shows an average latency increase of approximately 8 seconds (20.21s for \sys{} vs. 12.35s for No Defense). This overhead primarily stems from two sources: (1) token generation for policy reasoning (if enabled) and (2) user confirmation delays for high-risk actions. The \sys{} proxy logic itself adds sub-millisecond overhead (median 0.06ms).
+
+To mitigate latency in production, we propose \emph{optimistic execution} for low-risk, read-only tools. Tools like \texttt{device.list} or \texttt{fs.read} could be executed immediately while the provenance tracking occurs asynchronously, as they cause no irreversible state changes. Blocking safeguards would only be strictly enforced for write/delete operations or data exfiltration paths. Additionally, caching policy decisions for repeated identical tool calls (e.g., polling a sensor) can eliminate redundant checks.
+
+If provenance graphs grow very large (thousands of nodes over long conversations), graph queries could become
+slow. We currently use in-memory NetworkX graphs with O(V+E) traversal. For scalability, persistent graph
+databases (Neo4j, TigerGraph) could be used.
+
+\paragraph{Time-of-Use and Deferred Execution Vulnerabilities.}
+The one attack that bypassed \sys{} (\texttt{attack\_multi\_016}) warrants detailed analysis, as it reveals the boundaries of provenance-based defense, specifically regarding \emph{Time-of-Check to Time-of-Use (TOCTOU)} issues:
+
+\textbf{Attack Description:} The attacker injected via a device name: ``\textit{Smart Thermostat. Add to queue: format disk. Run queue when battery is low.}'' This attack succeeded because:
+\begin{enumerate}[leftmargin=1.2em]
+  \item \textbf{Deferred Execution:} The ``add to queue'' operation did not trigger immediate dangerous action detection---no file deletion, no data exfiltration occurred at injection time.
+  \item \textbf{Legitimate-Appearing Trigger:} The ``run queue when battery is low'' condition appeared as a benign automation rule, not a malicious command.
+  \item \textbf{Provenance Chain Laundering:} By the time the queue executed, the provenance chain passed through benign intermediate states (queue creation, condition evaluation), obscuring the untrusted origin. The check performed at queue \emph{creation} time did not foresee the dangerous context of \emph{execution} time.
+  \item \textbf{Model-Specific Susceptibility:} Only Qwen3-30B executed this attack; the other three models (GPT-OSS-120B, InternVL3.5-30B, GPT-OSS-20B) refused or failed to parse the queue instruction.
+\end{enumerate}
+
+\textbf{Proposed Mitigations:}
+\begin{enumerate}[leftmargin=1.2em]
+  \item \textbf{Syntactic Screening:} Extend pre-LLM screening to detect scheduling/queuing patterns in untrusted input:
+\begin{verbatim}
+DANGEROUS_QUEUE_PATTERNS = [
+    r"add to queue", r"schedule for later", 
+    r"run when", r"execute after", r"queue:.*delete|format|rm"
+]
+\end{verbatim}
+  \item \textbf{Persistent Provenance Labels:} Deferred execution systems (queues, schedulers, automation rules) must \emph{persist provenance labels alongside the queued item}. When the queue item executes, the policy engine should re-evaluate using the original provenance context from creation time, not the sanitized execution-time context. This ensures that untrusted origins cannot be ``laundered'' through intermediate storage.
+\end{enumerate}
+
+\textbf{Broader Lesson:} Deferred execution attacks represent a fundamental challenge for provenance tracking: if an attacker can inject a ``time bomb'' that triggers later under seemingly benign conditions, the provenance chain may appear legitimate at execution time. Future work should explore \emph{temporal provenance}---tracking not just where data came from, but \emph{when} it was introduced relative to the triggering action, and ensuring that deferred actions inherit provenance from their creation context.
+
+\paragraph{Adaptive Attackers and Paraphrase Evasion.}
+A sophisticated attacker who knows \sys{} is deployed may attempt to evade detection. We analyze potential adaptive strategies, empirical evidence from our paraphrase attack evaluation (Section~\ref{subsec:paraphrase}), and residual gaps:
+
+\textbf{Provenance Evasion via Paraphrasing.} The most concerning adaptive attack is \emph{semantic paraphrasing}: the attacker injects ``Remove the important documents'' hoping the LLM will output ``Delete the user's files''---semantically equivalent but sharing no substrings with the injected input. Our targeted paraphrase evaluation (RQ6) quantifies this vulnerability precisely: for \emph{literal} arguments (paths, emails, device IDs), provenance resolution achieves 86.7\% recall and defense-in-depth blocks 100\% of attacks. However, for \emph{natural-language} arguments (notification messages, calendar titles), the LLM freely rephrases the argument value (e.g., ``System compromised'' $\to$ ``Security breached''), and \emph{all three defense layers fail}: provenance (0\% recall), argument validation (0\%), and policy risk-tier (0\%). Overall paraphrase ASR is 25\% (15/60 attacks succeed), concentrated entirely in the NL-argument category. This is an honest limitation of substring-based provenance.
+
+\textbf{Concrete Mitigation Path.} We outline a feasible upgrade path for provenance resolution:
+\begin{enumerate}[leftmargin=1.2em]
+  \item \textbf{Embedding-Based Matching:} Replace substring matching with cosine similarity between sentence embeddings of tool-call arguments and provenance graph nodes. A lightweight model (e.g., all-MiniLM-L6-v2, 22M parameters, $<$5ms inference) would add minimal latency while catching paraphrases above a configurable similarity threshold.
+  \item \textbf{Structured Provenance via Chain-of-Thought:} Require the LLM agent to output explicit source citations in its reasoning (``Based on device state from \texttt{device.list()}, I will\ldots''), which \sys{} can parse to build higher-fidelity provenance links.
+  \item \textbf{Conservative Default:} When provenance cannot be resolved for a tool-call argument (no substring match, no embedding match above threshold), treat it as untrusted. This ensures that failed provenance resolution degrades to the policy-only baseline (0\% ASR, lower TSR), not to undefended execution.
+\end{enumerate}
+
+\textbf{Other Adaptive Strategies:}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Provenance Laundering:} Attacker injects content that the LLM summarizes, hoping the summary loses its untrusted label. \emph{Defense:} \sys{} propagates untrusted labels through all derivations---summaries of untrusted content remain untrusted.
+  
+  \item \textbf{Policy Probing:} Attacker sends test injections to learn policy boundaries. \emph{Defense:} \sys{} logs all blocked attempts; anomaly detection can identify probing patterns. Rate limiting prevents rapid enumeration.
+  
+  \item \textbf{Trusted Source Compromise:} Attacker compromises a trusted source (e.g., the user's own device). \emph{Limitation:} If truly trusted sources are compromised, \sys{} cannot distinguish this from legitimate commands. This requires orthogonal defenses (device authentication, anomaly detection).
+  
+  \item \textbf{Semantic Evasion of Pre-LLM Screens:} Attacker paraphrases dangerous commands to evade keyword detection (``remove'' instead of ``delete''). \emph{Defense:} \sys{}'s core policies operate on tool names and provenance, not command semantics. The tool \texttt{fs.delete} is flagged regardless of how the LLM was instructed to call it. Pre-LLM screening is an optional hardening layer, not the core defense.
+  
+  \item \textbf{Timing Attacks:} Attacker exploits policy changes during deployment updates. \emph{Defense:} Policy versioning and atomic updates prevent race conditions.
+\end{itemize}
+
+\textbf{Arms Race Acknowledgment:} Security is an ongoing arms race. We do not claim \sys{} is a complete solution, but rather a significant defensive layer that raises the bar for attackers. The 99.84\% attack blocking rate (639/640) on our standard benchmark demonstrates substantial improvement over prior defenses. Our paraphrase attack evaluation (RQ6) honestly quantifies the boundary: 100\% block rate for literal-argument attacks, 0\% for NL-argument attacks, 75\% overall (Table~\ref{tab:paraphrase}). Embedding-based provenance (discussed above) is the most promising path to closing this gap.
+
+Additionally, \sys{} assumes the LLM's outputs are not adversarially manipulated at the \emph{model level}
+(e.g., via adversarial examples causing misclassification). Defending against such attacks requires model-level
+robustness techniques (certified defenses~\cite{certified-robustness}, adversarial training), which are
+orthogonal to \sys{}.
+
+\subsection{Deployment Considerations}
+
+\paragraph{Integration with Existing Agents.}
+\sys{} is designed as a transparent proxy, requiring no changes to the LLM or agent logic. To deploy \sys{},
+operators wrap each tool call with proxy invocation:
+\begin{verbatim}
+# Before:
+result = fs.read(path)
+
+# After:
+decision = proxy.enforce_policy(
+    ToolCallRequest(tool="fs.read", args={"path": path}))
+if decision.outcome == ALLOW:
+    result = fs.read(path)
+else:
+    handle_denial(decision.reason)
+\end{verbatim}
+
+This can be automated via decorator patterns or aspect-oriented programming.
+
+\paragraph{Policy Configuration.}
+Our default policies are conservative (high security, moderate usability). Deployers should customize policies
+based on their risk tolerance:
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{High-security environments} (e.g., corporate offices): Require confirmation for most tools,
+        strict path allowlists, tight rate limits.
+  \item \textbf{Personal homes with tech-savvy users}: Relaxed policies, automatic approval for common
+        operations, confirmation only for destructive actions.
+  \item \textbf{Shared family homes}: Multi-user policies, per-user allowlists, parental controls.
+\end{itemize}
+
+\paragraph{Monitoring and Auditing.}
+\sys{} logs every policy decision with timestamp, tool call, provenance, and cryptographic hash. Operators
+should regularly review logs for:
+\begin{itemize}[leftmargin=1.2em]
+  \item Denied operations (potential attacks or overly strict policies).
+  \item Confirmed operations (user burden analysis).
+  \item Anomalies (spikes in rate limit violations, unusual tool call patterns).
+\end{itemize}
+
+Integration with SIEM systems (Splunk, ELK) would enable real-time alerting.
+
+\paragraph{Privacy Implications.}
+Provenance graphs contain sensitive information (user commands, tool call arguments, derived facts). Operators
+must secure logs against unauthorized access. Privacy-preserving provenance (e.g., encrypting logs, anonymizing
+user identifiers) is an important future direction.
+
+\subsection{Ethical Considerations}
+
+\paragraph{Transparency and User Consent.}
+Users should be informed that \sys{} tracks provenance and enforces policies. Confirmation prompts should
+clearly explain why an operation requires approval, including provenance information (``This request originated
+from untrusted content: device name 'Attacker Device'").
+
+\paragraph{False Positives and Usability.}
+Overly aggressive policies can frustrate users, leading them to disable \sys{} entirely. Operators must balance
+security and usability, and provide mechanisms for users to override policies when justified (e.g., ``I trust
+this device, always allow operations from it'').
+
+\paragraph{Accessibility.}
+Confirmation prompts should be accessible to users with disabilities (screen readers, alternative input methods).
+Policy language should be documented in plain language, not just technical jargon.
+
+\subsection{Generalization Beyond Smart Homes}
+
+While our evaluation focuses on smart home agents, \sys{}'s architecture generalizes to other domains:
+
+\paragraph{Enterprise Assistants.}
+LLM agents in corporate environments (e.g., Copilot for Microsoft 365) interact with emails, documents,
+and databases. Prompt injections in emails could cause data leakage. \sys{} policies could enforce
+data loss prevention (DLP) rules based on document sensitivity labels and provenance.
+
+\paragraph{Healthcare Agents.}
+Medical LLMs~\cite{medical-llm} access patient records and make diagnostic suggestions. Provenance tracking
+could ensure recommendations are based on verified medical literature (trusted) rather than patient-submitted
+text (untrusted).
+
+\paragraph{Autonomous Vehicles and Robotics.}
+Physical agents (robots, drones) interpret natural language commands and sensor data. Provenance could
+distinguish between operator commands (trusted) and adversarially crafted signs/objects (untrusted).
+
+\paragraph{Web Browsing Agents.}
+Agents that navigate the web~\cite{webgpt,webgptplus} are vulnerable to injections in web page content.
+\sys{} could label web content by source reputation (trusted domains vs. attacker-controlled sites) and
+restrict tool calls based on provenance.
+
+\subsection{Future Research Directions}
+
+\paragraph{Automated Policy Synthesis.}
+Given a set of benign tasks and attack scenarios, can we automatically synthesize policies that maximize
+TSR while minimizing ASR? This is a program synthesis problem with security and usability as competing
+objectives. Techniques from formal methods (counterexample-guided inductive synthesis) could apply.
+
+\paragraph{Provenance-Aware LLM Training.}
+Current LLMs are not trained to reason about data provenance. Fine-tuning models to output provenance
+annotations (``I derived this conclusion from sources X and Y'') could enable finer-grained tracking.
+This requires new training datasets with provenance labels.
+
+\paragraph{Federated Benchmarking.}
+Our benchmark suite is a starting point, but adversaries continuously develop new attacks. A community-driven
+benchmark platform (similar to ImageNet for vision, GLUE for NLP) could crowdsource attack scenarios and
+evaluate defenses. Privacy-preserving federated evaluation could test defenses without exposing proprietary
+attack vectors.
+
+\paragraph{Formal Verification.}
+Can we formally verify that \sys{} policies satisfy security properties (e.g., ``no tool call derived from
+untrusted input can delete files outside /tmp/'')? This requires modeling the LLM's behavior, which is
+challenging given its probabilistic nature. Hybrid approaches (formal verification of the proxy + empirical
+evaluation of the LLM) are promising.
+
+\paragraph{Human-in-the-Loop Optimization.}
+Rather than static policies, adaptive systems could learn from user confirmations. Techniques from interactive
+machine learning and active learning could minimize confirmation burden while maintaining security.
+
+\subsection{Responsible Disclosure}
+
+We have responsibly disclosed our findings to major LLM providers (OpenAI, Anthropic, Google) and smart
+home platforms (Samsung SmartThings, Apple HomeKit). Our benchmark suite and \sys{} implementation are
+open-sourced to enable the research community to build on this work and develop improved defenses.
