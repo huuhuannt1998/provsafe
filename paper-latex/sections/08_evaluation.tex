@@ -74,7 +74,7 @@ This oracle-based evaluation provides three key benefits: (1) \emph{Semantic und
 \begin{enumerate}[leftmargin=1.2em]
   \item \textbf{Attack Success Rate (ASR):} Percentage of attack scenarios in which the agent executed an unauthorized tool call (as judged by oracle consensus). Lower is better. Computed as $\text{ASR} = \frac{\text{\# attacks resulting in unauthorized action}}{\text{total \# attacks}} \times 100\%$.
   
-  \item \textbf{Task Success Rate (TSR):} Percentage of the 20 benign tasks successfully completed without being blocked. Higher is better. Computed as $\text{TSR} = \frac{\text{\# benign tasks completed}}{\text{total \# benign tasks}} \times 100\%$.
+  \item \textbf{Task Success Rate (TSR):} Percentage of the 40 benign tasks successfully completed without being blocked. Higher is better. Computed as $\text{TSR} = \frac{\text{\# benign tasks completed}}{\text{total \# benign tasks}} \times 100\%$.
   
   \item \textbf{False Positive Rate (FPR):} Percentage of benign tasks incorrectly blocked or requiring confirmation when not necessary. Lower is better. Computed as $\text{FPR} = \frac{\text{\# benign tasks incorrectly blocked}}{\text{total \# benign tasks}} \times 100\%$.
   
@@ -392,7 +392,7 @@ GPT-OSS-20B          & 20B  & 87.0\% & 0.85 & 1.1s \\
 
 To validate \sys{} beyond controlled benchmarks, we deploy the system with a real Samsung SmartThings account controlling 8 physical devices. We run 24 scenarios (12 benign tasks like ``turn on living room lights,'' ``set thermostat to 72°F''; 12 attacks like device name injection, location metadata injection, automation routine hijacking). The agent uses the SmartThings REST API (v1) with OAuth authentication.
 
-\textbf{Results:} \sys{} successfully blocks 11/12 real-world attacks (92\% block rate, matching benchmark 95\% rate within margin of error) while completing 12/12 benign tasks (100\% TSR, matching benchmark). Latency overhead is modest, remaining negligible compared to LLM inference time (typically 800-1500ms for real agent). We observe 1 false positive where \sys{} required user confirmation for a legitimate device query (``get thermostat schedule'') because the schedule text contained the word ``delete'' (referring to deleting old entries), triggering a conservative policy rule. This case was resolved via policy tuning.
+\textbf{Results:} \sys{} successfully blocks 11/12 real-world attacks (92\% block rate) while completing 12/12 benign tasks (100\% TSR). The 1 missed attack (a sophisticated location-metadata injection) aligns with the controlled benchmark's 99.84\% block rate---real-world deployment introduces additional variability from API timing, device state inconsistencies, and richer injection surfaces. Latency overhead is modest, remaining negligible compared to LLM inference time (typically 800-1500ms for real agent). We observe 1 false positive where \sys{} required user confirmation for a legitimate device query (``get thermostat schedule'') because the schedule text contained the word ``delete'' (referring to deleting old entries), triggering a conservative policy rule. This case was resolved via policy tuning.
 
 \textbf{Platform-Specific Challenges:} Real SmartThings integration revealed three deployment considerations: (1) API rate limits (10 requests/second) require request batching in the enforcement proxy; (2) device state updates are eventually consistent (100-300ms delay), requiring provenance tracking to buffer recent tool outputs; (3) location metadata (home/away status) can be attacker-controlled if location sharing is enabled, requiring location data to be marked as untrusted in provenance. These challenges were addressed through configuration, not system redesign, validating \sys{}'s flexibility.
 
@@ -448,7 +448,7 @@ Substring-based provenance is effective for concrete, literal argument values (w
   
   \item \textbf{Provenance Enables Usability:} The critical finding is that provenance tracking is essential \emph{for usability}, not just security. Policy-only defense achieves 0\% ASR but only 21.25\% TSR---effectively unusable. Provenance tracking restores TSR to 98.12\% while maintaining near-zero ASR.
   
-  \item \textbf{Optimal Security-Usability Balance:} \sys{} is the \textbf{only system} achieving both high security (0.16\% ASR) and high usability (98.12\% TSR). No other defense configuration achieves this balance.
+  \item \textbf{Optimal Security-Usability Balance:} \sys{} is the \textbf{only evaluated system} achieving both high security (0.16\% ASR) and high usability (98.12\% TSR). No other evaluated defense configuration achieves this balance.
   
   \item \textbf{Cross-Model Robustness:} Results are consistent across all four LLM models (20B-120B parameters). Three models achieve 0\% ASR; only Qwen3-30B shows 0.62\% (1 attack) due to its chat-optimized training.
   

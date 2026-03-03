@@ -37,7 +37,8 @@ deployment of AI in real-world systems.
   \item \textbf{Provenance enables both security AND usability}: Without provenance, policies must conservatively block operations (21.25\% TSR). With provenance, \sys{} achieves 98.12\% TSR while maintaining 0.16\% ASR.
   \item \textbf{Defense-in-depth at the tool-call boundary} is more robust than prompt-level filtering,
         achieving 0\% ASR on encoding obfuscation (vs. 47.2\% baseline) and role-play jailbreaks (vs. 27.5\% baseline).
-  \item \textbf{Cross-model consistency}: Three of four LLM models (20B-120B parameters) achieve perfect 0\% ASR, demonstrating that \sys{}'s defense is architecture-agnostic.
+  \item \textbf{Cross-model consistency}: Three of four LLM models (20B-120B parameters) achieve perfect 0\% ASR, demonstrating that \sys{}'s defense is architecture-agnostic. Because the proxy operates entirely at the tool-call boundary, it can be retrofitted to any existing LLM agent deployment without model modification---a key practical advantage.
+  \item \textbf{Provenance graphs provide structural explainability}: Users and auditors can inspect exactly which data sources influenced a blocked or approved decision, aligning with emerging requirements for transparent AI systems.
   \item \textbf{Policies must be composable and context-aware}, combining risk tiers, provenance, scope,
         temporal constraints, and evidence requirements.
   \item \textbf{Reproducible benchmarks and open-source tools} are essential for advancing LLM agent

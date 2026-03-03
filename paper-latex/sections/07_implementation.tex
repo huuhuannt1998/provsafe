@@ -51,7 +51,7 @@ A critical implementation challenge is \emph{provenance resolution}: given a too
 
 \textbf{Stage 3: Conservative Default.} If no match is found in Stages 1--2, the argument is treated as \emph{unresolved}. Unresolved arguments are handled according to policy configuration: the default policy treats them as untrusted (conservative), requiring confirmation for \texttt{HIGH}-risk tools. This ensures that failed resolution degrades to safe behavior, not to undefended execution.
 
-\textbf{Limitations.} This pipeline relies on lexical overlap and does not handle semantic paraphrasing (see Section~\ref{sec:discussion}). In our evaluation, Stages 1--2 successfully resolved provenance for 95\% of attack scenarios. The remaining 5\% were caught by other defense layers (pre-LLM screening, argument validation).
+\textbf{Limitations.} This pipeline relies on lexical overlap and does not handle semantic paraphrasing (see Section~\ref{sec:discussion}). On our standard benchmark (explicit string injection), Stages 1--2 successfully resolved provenance for 95\% of attack scenarios; the remaining 5\% were caught by other defense layers (pre-LLM screening, argument validation). Against adaptive paraphrase attacks, provenance recall drops to 65\% overall (Section~\ref{subsec:paraphrase}).
 
 \subsection{Lines of Code}
 

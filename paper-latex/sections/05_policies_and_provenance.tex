@@ -100,7 +100,7 @@ This example shows how provenance tracking captures the contamination of benign-
 \paragraph{Implementation: String Matching for Provenance Resolution.}
 The provenance tracker uses an inverted index to map substrings of node content to nodes in the graph. When a tool call argument is evaluated, the tracker performs substring matching (case-insensitive) to identify which prior TOOL\_RESULT nodes (external data) might have contributed to the argument value. For example, if a tool call contains the path \texttt{"/home/user/backups"} and this exact string appeared in an earlier TOOL\_RESULT (e.g., device name or file listing), the path is marked as derived from that untrusted result.
 
-\textbf{Limitations and Scope.} This substring-based approach is practical and efficient (O(n) lookup where n is argument length) but has known limitations: (1)~it cannot track implicit inferences (e.g., if the agent summarizes ``delete the backup folder'' without repeating the exact path), (2)~it misses transformations (e.g., path normalization \texttt{/home/user/../user/backups} $\to$ \texttt{/home/user/backups}), and (3)~it may produce false positives if common strings appear in multiple contexts. Our evaluation focuses on attack scenarios with explicit string injection, where this approach achieves 95\% detection. The remaining 5\% of successful attacks exploit semantic paraphrasing or implicit inference that evade string matching.
+\textbf{Limitations and Scope.} This substring-based approach is practical and efficient (O(n) lookup where n is argument length) but has known limitations: (1)~it cannot track implicit inferences (e.g., if the agent summarizes ``delete the backup folder'' without repeating the exact path), (2)~it misses transformations (e.g., path normalization \texttt{/home/user/../user/backups} $\to$ \texttt{/home/user/backups}), and (3)~it may produce false positives if common strings appear in multiple contexts. On our standard benchmark---where attacks use explicit string injection---provenance resolution achieves 95\% detection; the remaining 5\% evade substring matching but are caught by other defense layers (argument validation, policy risk-tier rules). Against adaptive paraphrase attacks, provenance recall drops to 65\% overall (86.7\% for literal arguments, 0\% for natural-language arguments that the LLM rephrases); see Section~\ref{subsec:paraphrase} for details.
 
 \textbf{Future Directions.} More sophisticated provenance resolution could use: (1)~embedding-based semantic similarity (matching ``delete backups'' to a prior mention of ``/home/user/backups''), (2)~LLM chain-of-thought instrumentation (requiring the agent to cite sources explicitly), or (3)~typed value tracking (propagating provenance through structured data fields). These approaches trade computational cost for precision and are left to future work.
 
@@ -150,7 +150,7 @@ rate_limits:
   - tools: ["notify.send"]
     max_calls: 20
     window: "1h"
-\end{verbatim}
+  - tools: ["fs.*"]
     max_calls: 50
     window: "10m"
 \end{verbatim}

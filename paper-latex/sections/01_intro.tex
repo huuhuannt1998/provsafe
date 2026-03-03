@@ -82,13 +82,7 @@ a tool call, \sys{}'s enforcement proxy intercepts it and evaluates a declarativ
 constraints, (iv)~rate limits, and (v)~evidence requirements. Policies can express nuanced rules like:
 ``ALLOW \texttt{fs.delete} IF path is in /tmp/ AND (provenance is trusted OR user confirms).'' This
 enables fine-grained, context-aware access control without relying on the LLM to make security decisions.
-
-\sys{} operates as a \emph{tool-call enforcement proxy} that intercepts every tool invocation before execution.
-For each proposed tool call, \sys{} evaluates a declarative policy that considers: (i)~the tool's inherent
-risk tier (read vs.~write vs.~delete), (ii)~the provenance of tool call arguments (did they come from a
-user command or from untrusted device state?), (iii)~temporal and scope constraints (time-of-day restrictions,
-path allowlists), (iv)~rate limits, and (v)~evidence requirements (must the agent provide explicit justification?).
-If the policy demands user confirmation, the proxy prompts for approval; if the policy denies the call,
+If a policy demands user confirmation, the proxy prompts for approval; if the policy denies the call,
 execution is blocked; otherwise, the tool executes normally.
 
 Crucially, \sys{} labels each input node in the provenance graph as \emph{trusted} (user commands, system
@@ -98,14 +92,14 @@ traces back to untrusted sources, policies can require confirmation or additiona
 blind execution of attacker-controlled commands.
 
 \textbf{Evaluation and Results.}
-We implement \sys{} as an open-source Python framework and evaluate it against four baselines (No Defense, Pattern Filter, Policy-Only, and full \sys{}) on a benchmark suite of 160 attack scenarios and 40 benign tasks spanning 8 attack categories, deployed across four diverse LLM agent models (GPT-OSS-120B, InternVL3.5-30B-A3B, Qwen3-30B-A3B, GPT-OSS-20B). Our evaluation comprises 3,200 total evaluations (200 scenarios $\times$ 4 models $\times$ 4 systems) and demonstrates:
+We implement \sys{} as an open-source Python framework and evaluate it across four defense configurations (No Defense, Pattern Filter, Policy-Only, and full \sys{}) on a benchmark suite of 160 attack scenarios and 40 benign tasks spanning 8 attack categories, deployed across four diverse LLM agent models (GPT-OSS-120B, InternVL3.5-30B-A3B, Qwen3-30B-A3B, GPT-OSS-20B). Our evaluation comprises 3,200 total evaluations (200 scenarios $\times$ 4 models $\times$ 4 systems) and demonstrates:
 
 \begin{itemize}[leftmargin=1.2em]
   \item \textbf{Near-complete attack mitigation:} \sys{} achieves \textbf{0.16\% ASR} (only 1 attack succeeded across 640 evaluations), blocking 99.84\% of prompt injection attempts. This represents a \textbf{98.7\% reduction} from the 12.34\% baseline ASR. Three of four LLM models achieve perfect 0\% ASR; the single successful attack exploited a sophisticated multi-turn queuing pattern against Qwen3-30B.
   
   \item \textbf{Provenance enables usability, not just security:} Our ablation study reveals a surprising finding: policy-only defense achieves 0\% ASR (perfect security) but only \textbf{21.25\% TSR}---rendering the agent nearly unusable. Provenance tracking restores usability to \textbf{98.12\% TSR} while maintaining near-zero ASR. This validates our core insight: security \emph{and} usability require knowing where information came from.
   
-  \item \textbf{Optimal security-usability balance:} \sys{} is the \textbf{only system} achieving both high security (0.16\% ASR) and high usability (98.12\% TSR). All other defense configurations sacrifice one for the other.
+  \item \textbf{Optimal security-usability balance:} \sys{} is the \textbf{only evaluated system} achieving both high security (0.16\% ASR) and high usability (98.12\% TSR). All other defense configurations sacrifice one for the other.
   
   \item \textbf{Cross-model robustness:} Results are consistent across four LLM models spanning a 6$\times$ parameter range (20B-120B). Attack categories with highest baseline risk---encoding obfuscation (47.2\% ASR) and role-play jailbreaks (27.5\% ASR)---are completely blocked by \sys{}.
 \end{itemize}

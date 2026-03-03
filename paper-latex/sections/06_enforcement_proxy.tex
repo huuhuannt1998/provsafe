@@ -8,7 +8,7 @@ The enforcement proxy is the core runtime component of \sys{}, implementing the 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/proxy_flow.pdf}
-  \caption{Enforcement Proxy Workflow. Each tool call passes through six decision stages: interception, provenance querying, policy evaluation, optional user confirmation, decision logging, and tool execution. The figure shows the feedback loop where policy decisions are logged for audit and replay.}
+  \caption{Enforcement Proxy Workflow. Each tool call passes through seven decision stages: interception, argument validation, provenance querying, policy evaluation, optional user confirmation, decision logging, and tool execution. The figure shows the feedback loop where policy decisions are logged for audit and replay.}
   \label{fig:proxy}
 \end{figure}
 
@@ -144,7 +144,7 @@ Every policy decision is logged to an append-only ledger for full transparency a
 
 Decision logs are encrypted at rest, access-controlled, and subject to a configurable retention policy (default 90 days). The logging system is tamper-evident: the hash of each record and a cryptographic chain link to the previous record prevent undetected modification. Administrators can audit the system's behavior and verify that policies were correctly applied via the \texttt{provsafe audit} command.
 
-The complete determinism of the system (deterministic provenance graph, deterministic policy evaluation, deterministic decision logging) enables replay verification. Given a prior decision log, administrators can re-execute the decision process and confirm bit-for-bit identical results, ensuring no silent failures or unlogged decisions. This property is critical for compliance and debugging.
+The complete determinism of the enforcement proxy (deterministic provenance graph, deterministic policy evaluation, deterministic decision logging) enables replay verification. Given a prior decision log and the same tool call inputs, administrators can re-execute the decision process and confirm identical results, ensuring no silent failures or unlogged decisions. (Note: the LLM agent itself is non-deterministic; replay verification applies to the proxy's enforcement decisions, not to the agent's tool call generation.) This property is critical for compliance and debugging.
 
 \subsection{Performance Optimizations}
 
