@@ -9,7 +9,7 @@ that LLMs cannot reliably separate instructions from data. Greshake et al.~\cite
 \emph{indirect prompt injection}, where attackers embed malicious instructions in external content (web pages,
 emails) that the LLM reads during execution. Recent surveys~\cite{prompt-injection-taxonomy,jailbreak-survey}
 catalog attack variants including jailbreaks, role-play exploits, and encoding obfuscation. Our work builds
-on this taxonomy, systematically categorizing attacks into 10 categories and demonstrating defense effectiveness
+on this taxonomy, systematically categorizing attacks into 8 categories and demonstrating defense effectiveness
 via comprehensive benchmarking.
 
 \paragraph{Input Filtering and Detection.}
@@ -93,7 +93,7 @@ tool call may be allowed or denied depending on its provenance. Our ablation stu
 \paragraph{Summary of Key Differences.}
 \begin{table}[t]
 \centering
-\caption{\sys{} vs. Prior Defenses. \sys{} is the first to combine provenance tracking with policy
+\caption{\sys{} vs. Prior Defenses. \sys{} combines provenance tracking with policy
 enforcement at the tool-call boundary, enabling context-aware security decisions.}
 \label{tab:related-comparison}
 \small
@@ -113,7 +113,7 @@ LangChain Guards~\cite{langchain-guardrails} & Tool & \xmark & \xmark & \xmark &
 \end{table}
 
 Table~\ref{tab:related-comparison} summarizes key differences. ``Provenance'' indicates tracking of data origins; ``Context'' indicates whether decisions consider conversation history; ``Indirect'' indicates defense against indirect injection (content read during execution). \sys{} is distinguished by: (1)~operating at
-the tool-call layer (immune to prompt evasion), (2)~tracking provenance (knowing where data came from),
+the tool-call layer (resistant to prompt-level evasion), (2)~tracking provenance (knowing where data came from),
 and (3)~defending against indirect injection via provenance-aware policies. 
 
 \textbf{Quantitative Comparison:} Our evaluation demonstrates \sys{}'s advantages concretely:
@@ -161,9 +161,9 @@ NeMo Guardrails~\cite{nemo-guardrails} & 20--30\% & 88\% & \xmark & Prompt & Pro
   
   \item \textbf{Superior usability:} Most defenses trade security for usability: PromptGuard achieves 15\% ASR but only 85\% recall (meaning 15\% of attacks and 15\% of benign inputs are misclassified). \sys{} achieves both 0.16\% ASR and 98.12\% TSR.
   
-  \item \textbf{Indirect injection defense:} \sys{} is the only system that fully defends against indirect prompt injection---attacks embedded in content the agent reads during execution (device names, files, calendars). Prior approaches primarily address direct injection (malicious user input).
+  \item \textbf{Indirect injection defense:} Among the systems we evaluated, \sys{} is the only one that addresses indirect prompt injection---attacks embedded in content the agent reads during execution (device names, files, calendars). Prior approaches primarily address direct injection (malicious user input).
   
-  \item \textbf{Tool-call boundary enforcement:} Operating at the tool-call layer rather than the prompt level makes \sys{} immune to prompt-level evasion techniques (encoding, paraphrasing, role-play).
+  \item \textbf{Tool-call boundary enforcement:} Operating at the tool-call layer rather than the prompt level makes \sys{} resistant to prompt-level evasion techniques (encoding, paraphrasing, role-play), since enforcement decisions do not depend on detecting malicious input strings.
 \end{itemize}
 
 \textbf{Benchmark Context:} We note that our benchmark (160 attacks, 40 benign, 8 categories, 4 models) is among the most comprehensive evaluations of LLM agent defense. InjecAgent~\cite{injecagent2024} reports that GPT-4 is vulnerable to 24\% of indirect injections in their benchmark, consistent with our 12.34\% baseline ASR (the difference reflecting attack sophistication and model differences). \sys{}'s 0.16\% ASR on this challenging benchmark represents a significant advance over prior work.
@@ -173,7 +173,7 @@ NeMo Guardrails~\cite{nemo-guardrails} & 20--30\% & 88\% & \xmark & Prompt & Pro
 \paragraph{Tool-Use Safety.}
 Schick et al.~\cite{schick2023toolformer} and Parisi et al.~\cite{talm} introduced tool-augmented LLMs but
 did not address security. Recent work~\cite{llm-tool-safety} identifies risks such as unintended tool calls,
-privilege escalation, and data leakage. \sys{} provides a formal framework (policy language + provenance)
+privilege escalation, and data leakage. \sys{} provides a structured framework (policy language + provenance)
 to mitigate these risks.
 
 \paragraph{Multi-Agent Systems.}
@@ -224,6 +224,19 @@ Decentralized Information Flow Control (DIFC)~\cite{difc-survey,flume} enforces 
 via security labels. Jif~\cite{jif} extends Java with information flow types. \sys{} is inspired by DIFC
 but tailored to LLM agents: trust labels are propagated through provenance, and policies gate tool execution.
 
+\paragraph{What Is New in the LLM-Agent Setting.}
+A natural question is whether \sys{} is ``merely taint tracking applied to tool calls.'' We argue that adapting provenance to LLM agents introduces three challenges absent from classical settings:
+
+\begin{enumerate}[leftmargin=1.2em]
+  \item \textbf{Opaque Computation.} Traditional taint tracking instruments \emph{source code} or \emph{bytecode} (e.g., TaintDroid rewrites Dalvik bytecode). LLMs are opaque: there is no ``source code'' to instrument, and billions of floating-point operations make per-token tracking infeasible. \sys{} therefore tracks provenance \emph{externally}, at the observable tool-call boundary, using output--input substring matching as a practical approximation. This design choice trades precision for deployability---no model modification is required.
+  
+  \item \textbf{Natural-Language Injection Surface.} In classical injection (SQL, XSS), the boundary between code and data is syntactically defined; taint tracking prevents data from crossing that boundary. In LLM agents, \emph{all} input is natural language, and the ``injection'' is the model deciding to follow an instruction embedded in data. The relevant enforcement boundary is therefore \emph{which tool calls the model requests}, not which bytes cross a parser boundary. To our knowledge, \sys{} is the first system to formalize this tool-call boundary as the taint-enforcement point for LLM agents.
+  
+  \item \textbf{Provenance-Gated Policy (Not Binary Taint).} Classical taint analysis is binary: tainted data is blocked; untainted data is allowed. This is too coarse for agents that \emph{must} read untrusted data to function (e.g., listing device states). \sys{} introduces provenance-gated policies that express nuanced decisions: ``allow reading untrusted data, but require confirmation before writing it to a sensitive path.'' Our ablation (Table~\ref{tab:ablation}) quantifies the cost of binary taint semantics: policy-only (without provenance-gated nuance) achieves 0\% ASR but only 21.25\% TSR.
+\end{enumerate}
+
+In short, the contribution is not taint tracking per se, but the \emph{adaptation} of provenance to an opaque, natural-language-mediated computation model, combined with a policy language that makes provenance actionable for practical agent deployment.
+
 \subsection{Smart Home Security}
 
 \paragraph{IoT Security Challenges.}
@@ -268,12 +281,11 @@ its provenance trace.
 
 \sys{} synthesizes ideas from prompt injection defense (detecting untrusted content), capability security
 (least privilege via policies), data provenance (tracking information flow), and IoT access control (context-aware
-authorization). To our knowledge, \sys{} is the first system to combine provenance-based trust tracking with
-policy enforcement for LLM agents, providing a principled defense against prompt injection attacks.
+authorization). The novelty lies not in any single component but in their \emph{composition for an opaque, natural-language-mediated computation model}: provenance must be tracked externally (the LLM is a black box), enforcement must occur at the tool-call boundary (the only observable control point), and policies must be provenance-gated rather than binary (agents must read untrusted data to function).
 
 \textbf{Key Differentiators from Prior Work:}
 \begin{itemize}[leftmargin=1.2em]
-  \item \textbf{Defense Layer:} Unlike pattern filters and guardrails that operate at the prompt level (before/after LLM processing), \sys{} operates at the tool-call boundary. This makes it immune to prompt-level evasion---even if an attacker crafts a perfect injection bypassing all prompt-level defenses, \sys{} blocks the resulting unauthorized tool call.
+  \item \textbf{Defense Layer:} Unlike pattern filters and guardrails that operate at the prompt level (before/after LLM processing), \sys{} operates at the tool-call boundary. This makes it resistant to prompt-level evasion---even if an attacker crafts an injection bypassing all prompt-level defenses, \sys{} blocks the resulting unauthorized tool call based on provenance.
   
   \item \textbf{Provenance Awareness:} Prior work (Rebuff, LLM Guard, NeMo Guardrails, LangChain) makes context-free decisions based on tool names and argument values. \sys{} tracks where arguments \emph{originated}---a file deletion is allowed when the path came from trusted user input, blocked when it traces to an attacker-controlled device name.
   

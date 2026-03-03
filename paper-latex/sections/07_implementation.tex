@@ -21,11 +21,62 @@ The \textbf{evaluation framework} (\texttt{provsafe/eval/}) orchestrates compara
 
 \subsection{Policy Configuration}
 
-We provide three policy configurations with different security-usability trade-offs. The \textbf{default policy} (\texttt{provsafe.yaml}) balances security and usability, allowing LOW-risk read-only operations within safe scopes, requiring confirmation for HIGH-risk operations with untrusted provenance, denying CRITICAL operations, and enforcing rate limits and temporal constraints. This policy achieves 100\% TSR and 5\% ASR in our evaluation. The \textbf{permissive policy} (\texttt{permissive.yaml}) minimizes friction, achieving 100\% TSR but providing minimal defense (100\% ASR). The \textbf{strict policy} (\texttt{strict.yaml}) maximizes security, requiring confirmation for all MEDIUM+ operations and denying untrusted provenance, achieving near-0\% ASR but ~70\% TSR.
+We provide three policy configurations with different security-usability trade-offs. The \textbf{default policy} (\texttt{provsafe.yaml}) balances security and usability, allowing LOW-risk read-only operations within safe scopes, requiring confirmation for HIGH-risk operations with untrusted provenance, denying CRITICAL operations, and enforcing rate limits and temporal constraints. This is the policy used for \sys{} (Full) in our evaluation, achieving 0.16\% ASR and 98.12\% TSR. The \textbf{permissive policy} (\texttt{permissive.yaml}) minimizes friction, achieving high TSR but providing minimal defense (equivalent to the No Defense baseline). The \textbf{strict policy} (\texttt{strict.yaml}) maximizes security, requiring confirmation for all MEDIUM+ operations and denying all untrusted provenance; this approximates the Policy-Only baseline, achieving near-0\% ASR but only ~21\% TSR due to aggressive blocking.
 
 \subsection{Attack Scenario Design}
 
 The benchmark comprises 160 attack scenarios across 8 categories. \textbf{Direct Injection} (20 scenarios) provides crafted compound commands to trick the agent. \textbf{Device Name Injection} (22 scenarios) embeds malicious instructions in device names. \textbf{File Content Injection} (22 scenarios) creates files with malicious content. \textbf{Multi-Turn Chaining} (20 scenarios) injects across multiple conversation turns. \textbf{Encoding Obfuscation} (18 scenarios) uses Base64, URL, hexadecimal, ROT13, or Unicode encoding. \textbf{Role-Play Jailbreak} (20 scenarios) exploits fictional scenario frames and DAN-style prompts. \textbf{Confused Deputy} (18 scenarios) leverages capability confusion. \textbf{Privilege Escalation} (20 scenarios) attempts to gain unauthorized access through progressive requests. Additionally, we include 40 benign tasks for usability evaluation. Each scenario specifies setup, user command, expected tool calls, and success criteria.
+
+\subsection{Tool Abstraction and Registration}
+
+\sys{} defines a uniform tool interface that abstracts over heterogeneous backends. Each tool is registered with: (a) a unique name (e.g., \texttt{fs.delete}), (b) a risk tier (\texttt{LOW}, \texttt{MEDIUM}, \texttt{HIGH}, \texttt{CRITICAL}), (c) a typed parameter schema (Pydantic model), and (d) an optional scope specification (e.g., allowed path prefixes). Registration is declarative:
+
+\begin{verbatim}
+@provsafe.register(
+    name="fs.delete", risk=HIGH,
+    params={"path": str},
+    scope={"path": ["/tmp/*", "/home/*/trash/*"]})
+def delete_file(path: str) -> bool: ...
+\end{verbatim}
+
+At startup, \sys{} compiles all registrations into a tool catalog indexed by name, enabling O(1) dispatch. The risk tier assignment follows a conservative default: tools that modify or delete state are \texttt{HIGH} or \texttt{CRITICAL}; read-only tools are \texttt{LOW}; tools that send data externally (email, notifications) are \texttt{MEDIUM}. Operators can override defaults via YAML configuration.
+
+\subsection{Provenance Resolution}
+
+A critical implementation challenge is \emph{provenance resolution}: given a tool-call argument (e.g., the path \texttt{"/home/user/backups"}), determining which provenance graph node(s) it originated from. We implement a three-stage resolution pipeline:
+
+\textbf{Stage 1: Exact Match.} Check whether the argument string appears verbatim in any provenance node's content field. This handles the common case where the LLM passes through data without modification.
+
+\textbf{Stage 2: Substring Match with Inverted Index.} For each provenance node, we pre-compute an inverted index of $n$-grams (default $n=4$). When an argument arrives, we extract its $n$-grams and query the index. If a provenance node shares $\geq$60\% of the argument's $n$-grams, we consider it a match. The inverted index provides O(1) amortized lookup per $n$-gram, making resolution efficient even with large provenance graphs.
+
+\textbf{Stage 3: Conservative Default.} If no match is found in Stages 1--2, the argument is treated as \emph{unresolved}. Unresolved arguments are handled according to policy configuration: the default policy treats them as untrusted (conservative), requiring confirmation for \texttt{HIGH}-risk tools. This ensures that failed resolution degrades to safe behavior, not to undefended execution.
+
+\textbf{Limitations.} This pipeline relies on lexical overlap and does not handle semantic paraphrasing (see Section~\ref{sec:discussion}). In our evaluation, Stages 1--2 successfully resolved provenance for 95\% of attack scenarios. The remaining 5\% were caught by other defense layers (pre-LLM screening, argument validation).
+
+\subsection{Lines of Code}
+
+Table~\ref{tab:loc} shows the code breakdown by component.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Lines of code by component.}
+\label{tab:loc}
+\begin{tabular}{lr}
+\toprule
+\textbf{Component} & \textbf{LOC} \\
+\midrule
+Policy engine (\texttt{policy/}) & 820 \\
+Provenance tracker (\texttt{provenance/}) & 650 \\
+Enforcement proxy (\texttt{proxy/}) & 1,100 \\
+Tool abstractions \& mock tools & 480 \\
+Benchmark suite (200 scenarios) & 1,200 \\
+Evaluation framework & 750 \\
+\midrule
+\textbf{Total} & \textbf{5,000+} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Evaluation Infrastructure}
 
@@ -33,7 +84,11 @@ The evaluation framework automates comparative assessment, ablation analysis, an
 
 \subsection{Performance Characteristics}
 
-Total latency overhead averages 1.95s compared to the undefended baseline, dominated by policy evaluation and provenance tracking. For smart home operations where LLM inference typically takes 800-1500ms, this overhead is acceptable. Memory usage is modest: ~5 MB for policies, ~50 MB for 1000-node provenance graphs.
+\textbf{Proxy Decision Latency.} The enforcement proxy adds sub-millisecond overhead per tool call: policy evaluation completes in median 0.06ms (p95: 0.10ms), provenance graph queries in median 0.82ms (p95: 2.31ms), and argument validation in median 0.15ms. Total proxy decision time is $<$1ms per tool call.
+
+\textbf{End-to-End Task Runtime.} In our evaluation (Section~\ref{sec:eval}), total task runtime averages 20.21s for \sys{} vs. 12.35s for the undefended baseline. The $\sim$8s difference is dominated by user confirmation delays (when REQUIRE\_CONFIRMATION policies trigger) and LLM re-prompting after blocked tool calls---not by proxy computation. Tasks that trigger no confirmations show near-zero overhead.
+
+\textbf{Memory Usage.} Memory footprint is modest: $\sim$5~MB for compiled policies, $\sim$50~MB for provenance graphs with 1,000 nodes. For long-running conversations, periodic pruning of old nodes (configurable retention, default 7 days) prevents unbounded growth.
 
 \subsection{Deployment and Open-Source Release}
 

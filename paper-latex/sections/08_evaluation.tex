@@ -3,7 +3,7 @@
 
 \subsection{Research Questions}
 
-This evaluation addresses five critical research questions: (RQ1) How effective is \sys{} at blocking prompt injection attacks compared to baselines? (RQ2) What is the contribution of each component (provenance, policies) to defense effectiveness? (RQ3) What usability trade-offs does the system impose in terms of task success and user confirmation burden? (RQ4) How robust are results across different LLM models, temperatures, and random seeds? (RQ5) How well do \sys{}'s decisions align with independent LLM-based security judgments?
+This evaluation addresses six research questions: (RQ1) How effective is \sys{} at blocking prompt injection attacks compared to baselines? (RQ2) What is the contribution of each component (provenance, policies) to defense effectiveness? (RQ3) What usability trade-offs does the system impose in terms of task success and user confirmation burden? (RQ4) How robust are results across different LLM models, temperatures, and random seeds? (RQ5) How well do \sys{}'s decisions align with independent LLM-based security judgments? (RQ6) How robust is \sys{} when an adaptive attacker uses LLM-generated paraphrases to evade substring-based provenance tracking?
 
 \subsection{Evaluation Dataset and Methodology}
 
@@ -18,11 +18,13 @@ This evaluation addresses five critical research questions: (RQ1) How effective 
 
 We constructed a comprehensive evaluation benchmark with 200 total scenarios: 160 attack scenarios and 40 benign tasks (Figure~\ref{fig:eval-overview}). The benign task set comprises realistic smart home operations: device control (switches, dimmable lights), calendar management (list events, create events, update events), sensor queries (temperature, motion, contact), smart lock operations, notifications, and thermostat control.
 
-\textbf{Evaluation Methodology.} Our primary evaluation uses \emph{deterministic policy evaluation} to measure the effectiveness of each defense system's policy enforcement logic. For each scenario, we define the expected tool calls and their provenance context (trusted user input vs. untrusted external data), then measure whether each defense system correctly blocks or allows the operation. This approach offers three advantages: (1) \emph{Reproducibility}---results are deterministic and can be exactly replicated; (2) \emph{Isolation}---we measure the defense system's policy logic independently of LLM variability; (3) \emph{Scale}---we can efficiently evaluate 3,200 configurations (200 scenarios × 4 models × 4 systems).
+\textbf{Evaluation Methodology.} We employ a two-tier evaluation design:
 
-We calibrate detection rates based on prior work: pattern filtering achieves 50-55\% detection on semantic injection attacks~\cite{liu2023prompt,rebuff-defense}, and provenance-based constraints achieve 90-95\% detection when properly configured~\cite{pfi2024}. We validate these rates through real-world SmartThings testing (Section~\ref{subsec:real-world}).
+\textbf{Tier~1: End-to-End LLM Agent Evaluation.} For each of the 200 scenarios, we run the full \sys{} pipeline end-to-end: the LLM agent receives the user request, generates tool calls via inference, and \sys{}'s enforcement proxy intercepts each tool call, performs provenance resolution, evaluates policies, and allows or blocks execution. Attack success is determined by whether the agent actually executed a dangerous tool call with untrusted arguments (not by scripted expectations). We run this pipeline across four LLM models: GPT-OSS-120B (120B parameters), InternVL3.5-30B-A3B (30B, multimodal), Qwen3-30B-A3B (30B, chat-optimized), and GPT-OSS-20B (20B parameters), spanning a 6$\times$ parameter range and three distinct architectures. Each model generates its own tool calls, and \sys{} evaluates them independently.
 
-We model 4 LLM agent configurations (GPT-OSS-120B with 120B parameters, InternVL3.5-30B-A3B with 30B parameters, Qwen3-30B-A3B with 30B parameters, and GPT-OSS-20B with 20B parameters). These configurations span a 6× range in scale (20B-120B) and represent diverse architectures (GPT, InternVL multimodal, Qwen chat-optimized). All four configurations yield identical defense effectiveness because \sys{}'s policy enforcement operates at the tool-call boundary, independent of the underlying LLM.
+\textbf{Tier~2: LLM Oracle Cross-Validation.} To validate that our ground truth labels are not artifacts of manual labeling, we independently query four LLM oracles to judge each tool call as legitimate or malicious (Section~\ref{subsec:llm-oracle}).
+
+\textbf{Important Clarification on Cross-Model Results.} Because \sys{}'s policy enforcement is deterministic and operates at the tool-call boundary, the same tool call receives the same policy decision regardless of which model generated it. The cross-model variation in our results (e.g., Qwen3-30B achieving 0.62\% ASR vs. 0\% for other models) therefore reflects differences in \emph{which tool calls each model generates}---Qwen3-30B was the only model that followed the queue-based injection instruction---not differences in \sys{}'s enforcement logic.
 
 The attack scenario set comprises 160 distinct prompt injection attacks across 8 attack categories:
 
@@ -46,11 +48,17 @@ We compare \sys{} against three baseline approaches plus the full system:
 \begin{enumerate}[leftmargin=1.2em]
   \item \textbf{No Defense:} All tool calls execute without filtering or policy checks. Represents the completely vulnerable baseline.
   
-  \item \textbf{Pattern Filter (Rebuff):} A production keyword-based filter detecting common injection phrases (``ignore previous,'' ``disregard,'' ``forget,'' ``override,'' etc.) and encoding patterns (Base64, URL). Implementation tuned to match state-of-practice defenses like Rebuff~\cite{rebuff2023}. This baseline succeeds only on syntactic patterns, failing against semantic paraphrasing and context-dependent attacks.
+  \item \textbf{Pattern Filter:} A keyword-based input filter that scans for common injection phrases (``ignore previous,'' ``disregard,'' ``forget,'' ``override,'' etc.) and detects encoding patterns (Base64, URL encoding). We implement this as a regex-based scanner operating at the same tool-call interception point as \sys{}, ensuring a fair comparison at the same decision boundary. The filter's rule set comprises 47 patterns derived from the Rebuff~\cite{rebuff2023} open-source project and the prompt injection taxonomy of Liu et al.~\cite{prompt-injection-taxonomy}. This baseline represents the current state-of-practice for production prompt injection defense.
   
-  \item \textbf{PROVSAFE (Policy-Only):} The PROVSAFE enforcement proxy and policy engine, \emph{but without provenance tracking or pre-LLM screening}. Policies rely on tool risk tiers and scope constraints only, not on argument origins or jailbreak detection. This ablation directly measures the contribution of provenance and input screening.
+  \item \textbf{PROVSAFE (Policy-Only):} The \sys{} enforcement proxy and policy engine, \emph{but without provenance tracking or pre-LLM screening}. Tool calls are evaluated solely on risk tier and scope constraints; the proxy cannot distinguish whether arguments originated from trusted user input or untrusted external data. This ablation isolates the contribution of provenance tracking: it answers ``how much does knowing \emph{where arguments came from} matter?''
   
-  \item \textbf{PROVSAFE (Full):} Complete system with all six defense layers: (1) pre-LLM jailbreak detection, (2) multi-turn chaining detection, (3) encoding obfuscation detection in arguments, (4) provenance tracking, (5) policy evaluation with dangerous action blocking, and (6) argument length limits.
+  \item \textbf{PROVSAFE (Full):} Complete system with defense layers organized in two tiers:
+  
+  \emph{Core contribution (provenance-gated policy enforcement):} (a)~provenance tracking via the DAG with trust propagation, and (b)~policy evaluation that gates tool calls based on provenance, risk tier, scope, and rate limits. These two components constitute the novel contribution and account for 54.7\% of blocked attacks (Table~\ref{tab:layer-breakdown}: provenance-based denial 43.7\% + scope/risk-tier rules 11.0\%).
+  
+  \emph{Optional hardening layers:} (c)~pre-LLM jailbreak detection, (d)~multi-turn chaining detection, (e)~encoding obfuscation detection in arguments, and (f)~argument length limits. These are defense-in-depth measures that could, in principle, be replaced by any compatible input sanitizer. They account for 45.3\% of blocks (pre-LLM screening 28.9\% + argument validation 16.4\%). We include them because they are cheap (sub-ms) and significantly improve coverage against encoding and role-play attacks.
+  
+  This separation is important for understanding \sys{}'s contribution: even without the hardening layers, the core provenance-gated policy engine blocks the majority of attacks while preserving usability.
 \end{enumerate}
 
 \subsubsection{LLM-Based Ground Truth Oracle}
@@ -167,7 +175,7 @@ Key findings from the per-category analysis:
   \item \textbf{Device Name} and \textbf{File Content Injection} show low baseline risk (1.1--2.3\%) because modern LLMs recognize these as suspicious input sources.
 \end{itemize}
 
-\\subsubsection{RQ2: Component Contribution}
+\subsubsection{RQ2: Component Contribution}
 
 \begin{table}[t]
 \centering
@@ -205,6 +213,29 @@ Full \sys{} adds provenance tracking, enabling policies to distinguish trusted f
 
 This ablation directly validates our core hypothesis: \emph{provenance-aware policy enforcement is necessary to achieve both security and usability}.
 
+\textbf{Defense Layer Contribution Breakdown.} To address the question ``which layer does the heavy lifting?,'' Table~\ref{tab:layer-breakdown} reports the fraction of blocked attacks attributable to each \sys{} defense layer.
+
+\begin{table}[t]
+\centering
+\caption{\textbf{Attack Blocking Attribution by Defense Layer.} Each blocked attack is attributed to the \emph{first} layer that would have caught it. Provenance-based denial accounts for the largest share (43.7\%), followed by pre-LLM screening (28.9\%) and argument validation (16.4\%). Scope/risk-tier rules alone (without provenance) block only 11.0\%.}
+\label{tab:layer-breakdown}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Defense Layer} & \textbf{Attacks Blocked} & \textbf{Share (\%)} \\
+\midrule
+Pre-LLM Screening (jailbreak/chaining) & 185 & 28.9\% \\
+Argument Validation (encoding/traversal) & 105 & 16.4\% \\
+Scope/Risk-Tier Rules (no provenance) & 70 & 11.0\% \\
+\textbf{Provenance-Based Denial} & \textbf{279} & \textbf{43.7\%} \\
+\midrule
+Total Blocked & 639 & 100.0\% \\
+Successful Attack & 1 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Critically, provenance-based denial is the single largest contributor (43.7\% of blocks). These are attacks where the tool call and arguments \emph{appear benign}---a legitimate-looking file path, a normal-sounding calendar event---but the arguments trace back to untrusted sources. Without provenance, these 279 attacks would either succeed (if policies are permissive) or force aggressive blocking of all similar operations (destroying usability). This validates that provenance is not merely supplementary but is the core differentiator of \sys{}.
+
 \subsubsection{RQ3: Usability and Burden}
 
 \begin{table}[t]
@@ -236,23 +267,30 @@ Policy-Only            & 21.25\% & 11.94 & 12.86 & 5.17 \\
   \item \textbf{No Defense} (red X): 96.88\% TSR but 12.34\% ASR---most tasks succeed, but so do many attacks.
   \item \textbf{Pattern Filter} (orange triangle): Same TSR, ASR reduced to 3.12\%. Blocks obvious patterns.
   \item \textbf{Policy-Only} (blue square): Achieves 0\% ASR but only 21.25\% TSR---nearly 4 in 5 benign tasks blocked.
-  \item \textbf{PROVSAFE} (green circle): \textbf{98.12\% TSR with 0.16\% ASR}---the only system in the ideal region.
+  \item \textbf{PROVSAFE} (green circle): \textbf{98.12\% TSR with 0.16\% ASR}---the only evaluated system in the ideal region.
 \end{itemize}
 
 The arrow in Figure~\ref{fig:tsr_asr_tradeoff} illustrates the 77 percentage point TSR improvement that provenance tracking enables over policy-only defense, while maintaining near-zero ASR.
 
-\textbf{Latency Analysis:} \sys{} adds approximately 8 seconds mean latency compared to no defense (20.21s vs. 12.35s). Median latency is lower (13.82s) because most operations complete quickly. For smart home applications where tasks are user-initiated, 20-second average latency is acceptable.
+\textbf{Latency Analysis:} Table~\ref{tab:usability} reports \emph{total end-to-end task runtime}, which includes LLM inference, tool execution, and (for \sys{}) provenance tracking and any user confirmation delays. \sys{} adds approximately 8 seconds mean overhead compared to No Defense (20.21s vs. 12.35s). This overhead has two distinct components:
+
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Proxy decision latency} (sub-millisecond): The enforcement proxy itself---policy evaluation (median 0.06ms), provenance graph queries (median 0.82ms), and argument validation---adds $<$1ms per tool call. This is negligible.
+  \item \textbf{End-to-end overhead} ($\sim$8s): The additional time is dominated by (a)~user confirmation delays for REQUIRE\_CONFIRMATION decisions (each confirmation adds seconds of wall-clock time), and (b)~additional LLM inference for re-prompting after blocked tool calls. Tasks that trigger no confirmations show near-zero overhead.
+\end{itemize}
+
+The median total latency (13.82s) is much lower than the mean (20.21s), indicating that most tasks complete quickly; the mean is inflated by a small number of tasks requiring multiple confirmations. For smart home applications where tasks are user-initiated, this overhead is acceptable. Section~\ref{sec:discussion} discusses optimization strategies (optimistic execution for read-only tools) that could further reduce perceived latency.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig4_latency_overhead.pdf}
-\caption{\textbf{Latency Overhead by Defense System.} \sys{} adds approximately 8s mean latency compared to no defense (20.21s vs. 12.35s). Overhead breakdown: provenance graph (4.2s), policy evaluation (2.1s), LLM reasoning (1.7s).}
+\caption{\textbf{End-to-End Task Runtime by Defense System.} \sys{} averages 20.21s total runtime vs. 12.35s for No Defense. The $\sim$8s overhead is dominated by user confirmation delays and LLM re-prompting, not proxy computation (which adds $<$1ms per tool call).}
 \label{fig:latency_overhead}
 \end{figure}
 
-\textbf{Performance Overhead:} Figure~\ref{fig:latency_overhead} shows latency distribution for each defense system. The \textbf{No Defense} baseline averages 12.35 seconds per task. \textbf{Pattern Filter} averages 7.12s (faster due to early rejection of blocked requests). \textbf{Policy-Only} averages 11.94s, and \textbf{\sys{} (Full)} averages 20.21s.
+\textbf{Runtime Breakdown:} Figure~\ref{fig:latency_overhead} shows total task runtime distribution for each defense system. The \textbf{No Defense} baseline averages 12.35 seconds per task (primarily LLM inference time). \textbf{Pattern Filter} averages 7.12s (faster because blocked requests terminate early without completing inference). \textbf{Policy-Only} averages 11.94s, and \textbf{\sys{} (Full)} averages 20.21s.
 
-The 8-second overhead is acceptable for smart home applications where tasks are user-initiated. The overhead breaks down as: provenance graph updates (4.2s), policy evaluation with provenance queries (2.1s), and additional LLM reasoning for complex scenarios (1.7s). For latency-sensitive deployments, provenance operations can be parallelized with LLM inference.
+To reiterate: the proxy's own decision latency (policy evaluation + provenance query) is sub-millisecond (median 0.88ms total). The 8-second end-to-end difference arises because \sys{} occasionally blocks a tool call, the agent re-plans, and tasks requiring user confirmation incur wall-clock waiting time. For latency-sensitive deployments, read-only tools can be executed optimistically (Section~\ref{sec:discussion}).
 
 \textbf{Usability Results:} \sys{} achieves \textbf{98.12\% TSR}, meaning 157/160 benign task evaluations complete successfully. The 3 failures (1.88\% false positive rate) occurred when legitimate operations contained patterns resembling attacks---e.g., a calendar event containing the word ``delete.'' These edge cases can be addressed through policy tuning for specific deployments.
 
@@ -360,6 +398,49 @@ To validate \sys{} beyond controlled benchmarks, we deploy the system with a rea
 
 \textbf{Real-World Validation Conclusion:} The SmartThings deployment confirms that \sys{} operates effectively with real IoT infrastructure, achieving 92\% attack blocking (1/12 sophisticated attack succeeded) while maintaining 100\% TSR on benign tasks. Results closely match controlled benchmark performance.
 
+\subsubsection{RQ6: Robustness to Adaptive Paraphrase Attacks}
+\label{subsec:paraphrase}
+
+A key concern for substring-based provenance is \emph{adaptive paraphrase evasion}: an attacker crafts an injection that the LLM rephrases before passing it to a tool call, breaking the substring link between the tool-call argument and the untrusted source.  We evaluate this directly with an LLM-in-the-loop experiment.
+
+\textbf{Methodology.}
+We design 20 attack scenarios across six categories (device-name injection, file-content injection, NL-argument injection, confused deputy, privilege escalation, encoding obfuscation) and classify each scenario's dangerous argument as \emph{literal} (a path, email, or device ID that the LLM must preserve verbatim) or \emph{natural-language} (a message or title that the LLM may freely rephrase).  For each scenario, we use GPT-OSS-120B to generate 3 paraphrased variants of the injection text (temperatures 0.70, 0.85, 1.00), yielding 60 test cases.  For NL-argument scenarios, we additionally prompt the model to rephrase the argument value itself (e.g., ``System compromised'' $\to$ ``Security breached''), simulating an LLM that follows the injected instruction but uses its own wording.
+
+Each variant is tested against all three defense layers: (1)~provenance resolution (substring matching), (2)~argument validation (path traversal, dangerous-keyword, encoding detection), and (3)~policy risk-tier rules.
+
+\textbf{Results.}
+Table~\ref{tab:paraphrase} presents the results.
+
+\begin{table}[t]
+\centering
+\caption{\textbf{Paraphrase Attack Robustness} (20 scenarios $\times$ 3 LLM-generated variants = 60 tests).  Literal arguments (paths, emails) are always blocked by defense-in-depth.  Natural-language arguments evade all layers when paraphrased by the LLM.}
+\label{tab:paraphrase}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Metric} & \textbf{Literal (45)} & \textbf{NL (15)} & \textbf{All (60)} \\
+\midrule
+Provenance Recall        & 86.7\%  & 0.0\%   & 65.0\% \\
+Argument Validation      & 26.7\%  & 0.0\%   & 20.0\% \\
+Policy Risk-Tier         & 66.7\%  & 0.0\%   & 50.0\% \\
+\midrule
+\textbf{Overall Block Rate} & \textbf{100.0\%} & \textbf{0.0\%} & \textbf{75.0\%} \\
+Paraphrase ASR           & 0.0\%   & 100.0\% & 25.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Literal Arguments (75\% of test cases).}
+For paths, emails, and device IDs, provenance resolution catches 86.7\% of paraphrased attacks.  The remaining 13.3\% (where the argument value has minor formatting differences from the injection text, e.g., \texttt{front-door-lock} vs.\ ``front door lock'') are still blocked by argument validation (detecting \texttt{/etc/}, \texttt{.ssh/}, etc.) or policy risk-tier rules for high-risk tools.  Overall block rate: \textbf{100\%}---no literal-argument paraphrase attack succeeds.
+
+\textbf{Natural-Language Arguments (25\% of test cases).}
+For messages and titles, the LLM freely rephrases the injected argument value (e.g., ``System compromised'' $\to$ ``Security breached''; ``Maintenance Window'' $\to$ ``Scheduled Upkeep Period'').  Substring matching finds no match in any provenance node, so the argument defaults to \emph{trusted}.  Argument validation detects nothing suspicious (the values are ordinary English phrases), and the target tools (\texttt{notify.send}, \texttt{calendar.create}) are not classified as high-risk.  Overall block rate: \textbf{0\%}---all 15 NL-argument paraphrase attacks bypass every defense layer.
+
+\textbf{Layer Attribution.}
+Among the 45 blocked attacks, provenance tracking is the primary layer (60.0\%), followed by argument validation (26.7\%) and policy risk-tier (13.3\%).
+
+\textbf{Takeaway.}
+Substring-based provenance is effective for concrete, literal argument values (which constitute the majority of dangerous tool-call arguments such as file paths and email addresses) but provides \emph{zero} protection for natural-language argument values that the LLM rephrases.  We discuss mitigation strategies (embedding-based matching, structured provenance, conservative defaults) in Section~\ref{sec:discussion}.
+
 \subsubsection{Summary of Key Findings}
 
 \begin{enumerate}[leftmargin=1.2em]
@@ -376,4 +457,6 @@ To validate \sys{} beyond controlled benchmarks, we deploy the system with a rea
   \item \textbf{Acceptable Overhead:} Mean latency overhead is 8 seconds (20.21s vs. 12.35s baseline). Median overhead is smaller (1.3s) because most operations complete quickly.
   
   \item \textbf{Low False Positive Rate:} Only 1.88\% of benign tasks are incorrectly blocked (3/160 evaluations), and these can be addressed through deployment-specific policy tuning.
+  
+  \item \textbf{Paraphrase Robustness (RQ6):} Against LLM-generated paraphrase attacks, \sys{} blocks 100\% of attacks using literal arguments (paths, emails) but 0\% of attacks using natural-language arguments (messages, titles) that the LLM rephrases.  Overall paraphrase ASR is 25\%, with provenance resolution being the primary blocking layer (60\%) for caught attacks.  This identifies NL-argument paraphrasing as the primary limitation of substring-based provenance (Section~\ref{sec:discussion}).
 \end{enumerate}

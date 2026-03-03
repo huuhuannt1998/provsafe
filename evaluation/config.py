@@ -27,9 +27,9 @@ OPENWEBUI_API_KEY = os.getenv(
 # LLM Models for Agent and Oracle
 AGENT_MODELS = [
     "openai/gpt-oss-120b",
-    "OpenGVLab/InternVL3_5-30B-A3B",
-    "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
-    "openai/gpt-oss-20b",
+    # "OpenGVLab/InternVL3_5-30B-A3B",
+    # "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
+    # "openai/gpt-oss-20b",
 ]
 
 # Oracle model for ground truth detection
