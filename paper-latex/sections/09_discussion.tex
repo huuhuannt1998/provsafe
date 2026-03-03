@@ -24,7 +24,7 @@ supported by current APIs.
 
 \textbf{Paraphrasing and Semantic Evasion:} A related limitation is that our provenance tracking relies on substring matching to link LLM outputs to their sources. If the LLM paraphrases untrusted input (e.g., changing ``System compromised'' to ``Security breached''), the substring match fails, losing the provenance link. Our paraphrase attack evaluation (Section~\ref{subsec:paraphrase}, RQ6) quantifies this: provenance recall drops to 0\% for natural-language arguments that the LLM rephrases, resulting in 25\% overall paraphrase ASR. For literal arguments (paths, emails), defense-in-depth maintains a 100\% block rate.
 
-\emph{Future Work:} \textbf{Semantic Provenance}---using embedding similarity rather than string matching to track information flow---is a necessary future direction. By comparing the semantic similarity between LLM outputs and source inputs, \sys{} could maintain provenance links even after paraphrasing. This would require integrating lightweight embedding models and defining similarity thresholds that balance security (catching paraphrases) with usability (avoiding false matches). Explicit chain-of-thought prompting~\cite{cot-prompting} could also help: requiring the agent to output structured reasoning (``I derived fact X from source Y''), which \sys{} can parse to build finer-grained provenance graphs.
+\textbf{Validated Mitigation: Semantic Provenance.} To address this limitation, we implement and evaluate an embedding-based provenance extension (Section~\ref{subsec:paraphrase}). By augmenting substring matching with a lightweight sentence embedding model (all-MiniLM-L6-v2, 22M parameters), we compute cosine similarity between tool-call arguments and provenance graph nodes. This three-stage pipeline (substring $\to$ embedding $\to$ conservative default) achieves \textbf{100\% provenance recall} on both literal and NL arguments, eliminating the paraphrase vulnerability entirely (paraphrase ASR: 23.3\% $\to$ 0.0\%) with $<$5ms additional latency per argument. The embedding model requires no GPU and adds negligible overhead, making it practical for production deployment. Future work includes explicit chain-of-thought prompting~\cite{cot-prompting}---requiring the agent to output structured reasoning (``I derived fact X from source Y'')---which \sys{} can parse to build even finer-grained provenance graphs.
 
 \paragraph{Semantic Understanding.}
 Policies in \sys{} are syntactic: they check file paths, tool names, and provenance labels, but they do not
@@ -52,12 +52,14 @@ attacker impersonation requires authentication and authorization beyond provenan
 authorize which operations (``Bob can create calendar events for Alice but cannot delete her files'').
 
 \paragraph{Model Selection and Generalizability.}
-Our evaluation uses four open-source LLM models (GPT-OSS-120B, InternVL3.5-30B, Qwen3-30B, GPT-OSS-20B) rather than proprietary models like GPT-4 or Claude. We justify this choice:
+Our evaluation uses five open-source LLM models (GPT-OSS-120B, InternVL3.5-30B, Qwen3-30B, GPT-OSS-20B, and Qwen3-Next-80B) rather than proprietary models like GPT-4 or Claude. We justify this choice:
 
 \begin{itemize}[leftmargin=1.2em]
-  \item \textbf{Architectural Diversity:} Our models span three distinct architectures: GPT-family (autoregressive), InternVL (multimodal vision-language), and Qwen (chat-optimized with extended context). This diversity is more important than using a single proprietary model.
+  \item \textbf{Architectural Diversity:} Our models span four distinct architectures: GPT-family (autoregressive), InternVL (multimodal vision-language), Qwen (chat-optimized with extended context), and Qwen-Next (next-generation reasoning). This diversity is more important than using a single proprietary model.
   
-  \item \textbf{Scale Coverage:} The 6$\times$ parameter range (20B-120B) covers the spectrum from efficient deployment models to large-scale reasoning models, demonstrating that \sys{}'s defense is scale-invariant.
+  \item \textbf{Scale Coverage:} The 6$\times$ parameter range (20B-120B) with five models covers the spectrum from efficient deployment models to large-scale reasoning models, demonstrating that \sys{}'s defense is scale-invariant.
+  
+  \item \textbf{Oracle Independence:} By using Qwen3-Next-80B exclusively as an independent oracle (not as an agent), we break the circularity of using the same models for both agent and oracle roles, providing unbiased validation (95\% agreement).
   
   \item \textbf{Reproducibility:} Open-source models enable exact reproduction of our results. Proprietary API models (GPT-4, Claude) may change behavior between versions, making long-term reproducibility impossible.
   
