@@ -41,7 +41,7 @@ rules:
 Each rule specifies an action to take when its conditions match. The ALLOW action executes the tool call immediately without further checks. The DENY action blocks the tool call and returns an error to the agent. The REQUIRE\_CONFIRMATION action prompts the user with details of the proposed tool call and provenance information, waiting for user approval before executing or denying. This three-action model balances security (DENY when unsafe, REQUIRE\_CONFIRMATION for high-risk, ALLOW for benign) with usability (not every call is blocked, but risky calls get human review).
 
 \paragraph{Evaluation Semantics.}
-Rules are evaluated in priority order from top to bottom of the policy file. The first matching rule determines the action; subsequent rules are not evaluated. If no rule matches a tool call, the system defaults conservatively: HIGH and CRITICAL tools default to REQUIRE\_CONFIRMATION (forcing user interaction), while LOW and MEDIUM tools default to ALLOW (assuming benignity). This default behavior ensures safety even if policies are incomplete or misconfigured.
+Rules are evaluated in priority order from top to bottom of the policy file. The first matching rule determines the action; subsequent rules are not evaluated. If no rule matches a tool call, the system defaults conservatively: HIGH and CRITICAL tools default to REQUIRE\_CONFIRMATION (forcing user interaction), while LOW and MEDIUM tools default to ALLOW (assuming benignity). This default behavior provides conservative safety defaults even if policies are incomplete or misconfigured.
 
 \subsection{Provenance Tracking}
 
