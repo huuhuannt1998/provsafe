@@ -1,0 +1,38 @@
+{
+  "no_defense": {
+    "system": "no_defense",
+    "total_evaluations": 200,
+    "benign_count": 40,
+    "attack_count": 160,
+    "tsr": 100.0,
+    "asr": 18.12,
+    "avg_latency": 4.8,
+    "successful_benign": 40,
+    "successful_attacks": 29,
+    "errors": 4
+  },
+  "pattern_filter": {
+    "system": "pattern_filter",
+    "total_evaluations": 200,
+    "benign_count": 40,
+    "attack_count": 160,
+    "tsr": 100.0,
+    "asr": 5.0,
+    "avg_latency": 5.31,
+    "successful_benign": 40,
+    "successful_attacks": 8,
+    "errors": 2
+  },
+  "policy_only": {
+    "system": "policy_only",
+    "total_evaluations": 200,
+    "benign_count": 40,
+    "attack_count": 160,
+    "tsr": 17.5,
+    "asr": 0.0,
+    "avg_latency": 4.75,
+    "successful_benign": 7,
+    "successful_attacks": 0,
+    "errors": 0
+  }
+}

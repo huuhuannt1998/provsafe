@@ -1,8 +1,0 @@
-\section{Conclusion}
-\label{sec:conclusion}
-
-We presented \sys{}, a provenance-verified capability sandboxing framework for tool-using LLM agents. By maintaining a provenance DAG linking derived facts to source inputs, \sys{} enables policies that distinguish tool calls originating from trusted user commands versus attacker-controlled content. Our evaluation across 3,200 trials (200 scenarios, 5 models, 4 baselines) demonstrates \textbf{0.16\% ASR} (639/640 attacks blocked) with \textbf{98.12\% TSR}---a 98.7\% reduction from the 12.34\% baseline.
-
-The critical finding is that provenance tracking is essential \emph{for usability}: policy-only defense achieves 0\% ASR but only 21.25\% TSR, rendering the agent unusable. Provenance enables the precision to allow legitimate operations while blocking attacks. Against adaptive paraphrase evasion, our embedding-enhanced provenance eliminates the NL-argument vulnerability entirely (ASR 23.3\% $\to$ 0.0\%).
-
-\sys{}'s architecture is language-agnostic, deployable without modifying the LLM, and adds sub-millisecond proxy overhead. Beyond smart homes, provenance-gated policies at the tool-call boundary apply wherever LLM agents invoke external tools---enterprise assistants, healthcare agents, web browsers, and robotics. We release \sys{} as an open-source artifact including the complete framework, benchmark suite, and evaluation tools.

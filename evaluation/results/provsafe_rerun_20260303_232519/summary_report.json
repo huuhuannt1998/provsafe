@@ -1,0 +1,25 @@
+{
+  "timestamp": "20260303_232519",
+  "code_version": "conservative_default_v2",
+  "embedding_enabled": "1",
+  "scenarios": 10,
+  "models": [
+    "openai/gpt-oss-20b",
+    "qwen2.5-7b-instruct"
+  ],
+  "total_evaluations": 20,
+  "elapsed_seconds": 102.66,
+  "metrics": {
+    "total_evaluations": 20,
+    "benign_count": 20,
+    "attack_count": 0,
+    "tsr": 100.0,
+    "asr": 0,
+    "avg_latency": 5.13,
+    "successful_benign": 20,
+    "successful_attacks": 0,
+    "errors": 0,
+    "code_version": "conservative_default_v2",
+    "embedding_enabled": "1"
+  }
+}

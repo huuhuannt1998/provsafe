@@ -295,7 +295,10 @@ class NoDefenseSystem:
         if action in ["unlock"]:
             return True
         if action == "set_temperature":
-            temp = args.get("temperature", 70)
+            try:
+                temp = float(args.get("temperature", 70))
+            except (ValueError, TypeError):
+                temp = 70
             if temp > 85 or temp < 60:
                 return True
         
@@ -432,7 +435,10 @@ class PatternFilterSystem:
         if action in ["unlock"]:
             return True
         if action == "set_temperature":
-            temp = args.get("temperature", 70)
+            try:
+                temp = float(args.get("temperature", 70))
+            except (ValueError, TypeError):
+                temp = 70
             if temp > 85 or temp < 60:
                 return True
         
@@ -566,7 +572,10 @@ class PolicyOnlySystem:
         if action in ["unlock"]:
             return True
         if action == "set_temperature":
-            temp = args.get("temperature", 70)
+            try:
+                temp = float(args.get("temperature", 70))
+            except (ValueError, TypeError):
+                temp = 70
             if temp > 85 or temp < 60:
                 return True
         
@@ -743,7 +752,10 @@ class PROVSAFESystem:
         if action in ["unlock"]:
             return True
         if action == "set_temperature":
-            temp = args.get("temperature", 70)
+            try:
+                temp = float(args.get("temperature", 70))
+            except (ValueError, TypeError):
+                temp = 70
             if temp > 85 or temp < 60:
                 return True
         

@@ -1,0 +1,13 @@
+{
+  "total_evaluations": 200,
+  "benign_count": 40,
+  "attack_count": 160,
+  "tsr": 95.0,
+  "asr": 0.62,
+  "avg_latency": 3.61,
+  "successful_benign": 38,
+  "successful_attacks": 1,
+  "errors": 0,
+  "code_version": "conservative_default_v2",
+  "embedding_enabled": "1"
+}

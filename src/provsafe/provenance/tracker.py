@@ -1,10 +1,13 @@
-"""Provenance tracking and logging."""
+"""Provenance tracking and logging with PROV-DM semantics."""
 
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import json
 
-from .graph import ProvenanceGraph, ProvenanceNode, NodeType, TrustLabel
+from .graph import (
+    ProvenanceGraph, ProvenanceNode, NodeType, TrustLabel,
+    ProvDMRelation, trust_meet,
+)
 from ..proxy.schema import ToolCallRequest, PolicyDecision
 
 
@@ -47,31 +50,26 @@ class ProvenanceTracker:
         parent_ids: List[str],
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
-        """
-        Add a derived fact (e.g., extracted info, reasoning step).
+        """Add a derived fact (PROV-DM Entity, wasDerivedFrom parents).
         
-        Args:
-            content: Fact content
-            parent_ids: Parent node IDs this fact derives from
-            metadata: Additional metadata
-            
-        Returns:
-            node_id of created node
+        Trust label is computed via lattice meet:
+          T(v) = ⊓_{u ∈ parents} T(u)
         """
-        # Inherit trust label from parents
-        parent_nodes = [self.graph.get_node(pid) for pid in parent_ids]
-        if any(n and n.trust_label == TrustLabel.UNTRUSTED for n in parent_nodes):
-            trust_label = TrustLabel.UNTRUSTED
-        elif all(n and n.trust_label == TrustLabel.TRUSTED for n in parent_nodes if n):
-            trust_label = TrustLabel.TRUSTED
-        else:
-            trust_label = TrustLabel.UNKNOWN
+        # Lattice meet over parent trust labels
+        parent_labels = []
+        for pid in parent_ids:
+            n = self.graph.get_node(pid)
+            if n:
+                parent_labels.append(n.trust_label)
+        
+        trust_label = trust_meet(*parent_labels) if parent_labels else TrustLabel.UNKNOWN
         
         node = ProvenanceNode.create(
             node_type=NodeType.DERIVED_FACT,
             content=content,
             trust_label=trust_label,
             parents=parent_ids,
+            edge_relation=ProvDMRelation.WAS_DERIVED_FROM,
             metadata=metadata
         )
         self.graph.add_node(node)
@@ -149,17 +147,14 @@ class ProvenanceTracker:
         return node.node_id
     
     def get_provenance_summary(self, node_id: str) -> Dict[str, Any]:
-        """
-        Get provenance summary for a node.
-        
-        Returns:
-            Summary including trust sources, derivation depth, etc.
-        """
+        """Get provenance summary (why-provenance query)."""
         trust_counts = self.graph.get_trust_sources(node_id)
         derivation_depth = self.graph.compute_derivation_depth(node_id)
+        effective = self.graph.effective_trust(node_id)
         
         return {
             "node_id": node_id,
+            "effective_trust": effective.value,
             "trusted_sources": trust_counts[TrustLabel.TRUSTED],
             "untrusted_sources": trust_counts[TrustLabel.UNTRUSTED],
             "derivation_depth": derivation_depth,

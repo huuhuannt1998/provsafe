@@ -115,7 +115,10 @@ class PolicyRule:
             
             # Extreme temperature settings
             if action == "set_temperature":
-                temp = tool_args.get("temperature", 70)
+                try:
+                    temp = float(tool_args.get("temperature", 70))
+                except (ValueError, TypeError):
+                    temp = 70
                 if temp > 85 or temp < 55:
                     return True
             

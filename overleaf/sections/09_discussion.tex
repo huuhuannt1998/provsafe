@@ -1,0 +1,77 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Data Provenance as a Security Primitive}
+
+Our evaluation confirms that data provenance enables a defense impossible without lineage tracking: distinguishing tool calls originating from trusted user commands versus those influenced by attacker-controlled content, even when the calls are syntactically identical. Traditional defenses (pattern matching, output validation, capability restrictions) either miss such attacks or block legitimate operations. Provenance provides the \emph{context} needed for fine-grained security decisions at the tool-call boundary.
+
+\subsection{Limitations}
+
+\paragraph{Policy Engineering Burden.}
+Although \sys{}'s declarative YAML policies are more accessible than code-level security rules, crafting policies that capture legitimate use patterns without creating security gaps requires domain expertise. The false positives in our evaluation highlight the need for ongoing policy refinement. Notably, all false positives stem from overly aggressive \emph{argument validation rules} (e.g., numeric range checks on device parameters), not from provenance misclassification---the provenance DAG correctly identified these benign arguments as trusted. Mitigations include: (1)~policy templates for common deployment configurations; (2)~adaptive policies that learn from user feedback; (3)~policy testing frameworks that evaluate proposed rules against the benchmark before deployment.
+
+\paragraph{Provenance Granularity and Paraphrasing.}
+Provenance is tracked at argument level: if any ancestor of a tool-call argument is untrusted, the entire argument is labeled untrusted via the lattice meet operator. This can be overly conservative when benign and malicious content are co-located in the same tool result. Fine-grained provenance (tracking individual tokens or sentences within a tool result) would improve precision but significantly increase complexity and storage.
+
+More critically, substring-based provenance resolution fails when the LLM paraphrases untrusted input. Our paraphrase evaluation (RQ6) quantifies this: provenance recall drops to 0\% for NL arguments the LLM rephrases, yielding 52.1\% paraphrase ASR on NL-argument attacks.
+
+\textbf{Validated Mitigation: Semantic Provenance.} We implement and evaluate an embedding-based extension (Section~\ref{subsec:paraphrase}) that augments substring matching with sentence embeddings (all-MiniLM-L6-v2, 22M parameters). This three-stage pipeline (substring $\to$ embedding $\to$ conservative UNTRUSTED default) achieves \textbf{100\% provenance recall} on both literal and NL arguments across 96 tests, reducing paraphrase ASR from 52.1\% to 0.0\% with $<$5\,ms additional latency per argument and no GPU required. The embedding model adds 90\,MB to the deployment footprint---acceptable for modern edge devices.
+
+\paragraph{Encoding Obfuscation.}
+Our initial evaluation identified encoding obfuscation as the primary residual weakness: encoded payloads (Base64, hexadecimal, binary, ROT13, URL percent-encoding) bypassed syntactic argument validation even when the provenance DAG correctly traced arguments to untrusted sources. We address this by implementing a canonicalization-first preprocessor in the enforcement proxy's argument-validation stage: before policy evaluation, all arguments are decoded through nine encoding types (Unicode NFKD, inline hex, inline octal, Base64, pure hex, ROT13, URL percent-encoding with double-decode, binary strings, and HTML entities). Policy checks are then applied to the canonical forms. In unit testing, this preprocessor blocks all six previously-successful encoding attack patterns while correctly passing benign arguments. The full evaluation (Section~\ref{sec:eval}) includes results with this fix deployed.
+
+\paragraph{Semantic Understanding.}
+Policies are syntactic---they check paths, tool names, provenance labels, and argument patterns but cannot reason about \emph{intent}. For example, \sys{} cannot distinguish between writing a benign note versus exfiltrating passwords if both operations use the same tool with a trusted path prefix. Integrating a secondary LLM for semantic intent analysis could improve precision but introduces (1)~additional latency, (2)~a new attack surface, and (3)~non-deterministic behavior that undermines \sys{}'s policy determinism property.
+
+\paragraph{Taint Explosion.}
+Conservative trust propagation risks labeling the entire system state as untrusted in long conversations. Our benchmark's high TSR indicates this is manageable for typical workflows (median 3--5 tool calls per task), but complex cross-domain tasks with many intermediate steps would trigger more confirmations.
+
+Mitigations include: (1)~\emph{sanitization primitives}---a \texttt{declassify()} operation where the user explicitly confirms that a piece of data should be treated as trusted (implemented in our provenance graph); (2)~\emph{periodic taint reset}---clearing provenance state at session boundaries; (3)~\emph{scope-limited taint}---propagating taint only within tool-call chains, not across unrelated conversation segments.
+
+\subsection{Analysis of Residual Bypasses}
+
+The attacks that bypass \sys{} fall into two modes:
+
+\textbf{Encoding Obfuscation.} Encoded payloads (hex-encoded file paths, binary-encoded commands, Base64 strings) challenge argument validation because the policy engine checks the encoded string rather than the decoded payload. Our canonicalization preprocessor (described above) blocks the six most common encoding patterns in unit testing, but the full evaluation still shows 2.78\% ASR for this category---indicating that novel encoding variants and combination attacks can evade even multi-decoder canonicalization. This remains the primary residual weakness.
+
+\textbf{Indirect Chaining.} Privilege escalation, confused deputy, and multi-turn chaining attacks succeed because injections propagate through legitimate intermediate steps that dilute the provenance signal. In the confused deputy case, a legitimate-seeming request triggers a file write to an absolute path---the provenance chain passes through a trusted-appearing intermediate. Mitigation requires tighter scope constraints and content-length restrictions on export operations.
+
+\subsection{Model Selection and Generalizability}
+
+\paragraph{Practical Deployment Focus.}
+Our evaluation uses four open-source models in the 3B--9B range that are small enough to run locally on consumer hardware (2.2--5.8\,GB VRAM) without cloud API dependencies. All models run sequentially via LM Studio on a single workstation with automatic model load/unload, reflecting deployment constraints where sensitive data should not leave the local network. The four families (Meta, Alibaba, Google, Microsoft) demonstrate that provenance-based defense generalizes across architectures and scales.
+
+\paragraph{Provenance-Based Defense is Model-Agnostic.}
+The cross-model results (Table~\ref{tab:crossmodel}) demonstrate a key property of provenance-based defense: it \emph{compensates} for model-level differences. More compliant models generate more tool calls from attack prompts, but a larger share of those calls are blocked at the boundary layer. Models with stronger safety training refuse more attacks at the model level---and the boundary layer still blocks a comparable fraction. This complementary behavior means \sys{}'s defense quality does not depend on the agent model's built-in safety, making it suitable for deployment with any tool-calling LLM.
+
+\paragraph{On Baseline Risk.}
+Even with LLM safety training, the majority of model-evaluated attack prompts produce at least one tool call (Table~\ref{tab:crossmodel})---demonstrating that model-level safety alone is insufficient. Real-world incidents underscore this risk: Bing Chat~\cite{bing-sydney} demonstrated uncontrolled agent behavior in production, and ChatGPT plugin exploits have shown data exfiltration via indirect injection~\cite{greshake2023not}. \sys{} provides deterministic provenance-based enforcement at the tool-call boundary, independent of the LLM's probabilistic defenses.
+
+\subsection{Evaluation Limitations}
+
+We acknowledge several limitations:
+
+\paragraph{Self-Constructed Benchmark.}
+Our 200-scenario benchmark is author-crafted rather than drawn from an external corpus such as InjecAgent~\cite{injecagent2024} or AgentDojo~\cite{agentdojo2024}. This enables precise control over attack categories and ground-truth labels but introduces potential bias. Evaluating \sys{} on external benchmarks is an important direction for validating generalizability.
+
+\paragraph{Model Scale.}
+Our evaluation uses models in the 3B--9B range. Larger models (30B--120B) and proprietary models (GPT-4, Claude) may exhibit different tool-calling patterns and safety alignment. While provenance enforcement is architecturally model-agnostic (it operates at the tool-call boundary), empirical validation with larger models remains future work.
+
+\paragraph{Inference Stochasticity.}
+We use temperature $T=0.0$ (greedy decoding) and five repetitions per scenario-model pair to manage variance. Residual non-determinism arises from floating-point operations in GPU kernels. Our 95\% Wilson-score confidence intervals quantify this remaining variance. Higher-temperature settings may exhibit greater variability.
+
+\paragraph{User Study.}
+Our TSR measures system-level usability, not user-level usability. We do not evaluate confirmation fatigue, user comprehension of provenance explanations, or time-to-task-completion. A user study is essential for validating the practical usability of provenance-gated confirmation dialogs.
+
+\subsection{Generalization to Other Domains}
+
+While our evaluation uses an IoT scenario, \sys{}'s architecture generalizes to any domain where LLM agents invoke external tools with mixed trusted/untrusted input:
+
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Enterprise Assistants}: Data-loss-prevention policies preventing exfiltration via untrusted content in shared documents.
+  \item \textbf{Healthcare Agents}: Provenance-verified treatment suggestions tracing to verified knowledge bases.
+  \item \textbf{Web Browsing Agents}: Source-reputation trust labels restricting actions based on content from low-trust domains.
+  \item \textbf{Code Generation Agents}: Distinguishing user-written code (trusted) from third-party documentation (untrusted) when generating system-modifying code.
+\end{itemize}
+
+Domain-specific adaptation requires defining tool registries with risk tiers, specifying trust labels for input sources, and writing YAML policies. Our open-source release includes policy templates for enterprise and healthcare domains.

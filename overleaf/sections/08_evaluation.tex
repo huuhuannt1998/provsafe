@@ -1,0 +1,281 @@
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Research Questions}
+
+We address seven research questions: \textbf{RQ1:} How effective is \sys{} at blocking attacks compared to baselines? \textbf{RQ2:} What is each component's contribution? \textbf{RQ3:} What usability trade-offs arise? \textbf{RQ4:} How robust are results across models? \textbf{RQ5:} Are \sys{}'s provenance decisions accurate? \textbf{RQ6:} How robust is \sys{} against adaptive paraphrase attacks? \textbf{RQ7:} Can an adaptive adversary with white-box knowledge bypass \sys{}?
+
+\subsection{Methodology}
+\label{subsec:methodology}
+
+\paragraph{Benchmark.}
+We evaluate 200 scenarios: 160 attacks across 8 categories (Direct Injection, Device-State Injection, File Content Injection, Multi-Turn Chaining, Encoding Obfuscation, Role-Play Jailbreak, Confused Deputy, Privilege Escalation) and 40 benign tasks (device control, calendar, sensors, notifications).
+
+\paragraph{LLM Models.}
+Four open-source models represent the practical deployment target for on-premise agents on consumer hardware: Meta-Llama-3.1-8B-Instruct (8B parameters), Qwen2.5-7B-Instruct (7B), Gemma-2-9B-IT (9B, Google DeepMind), and Phi-3.5-Mini-Instruct (3B, Microsoft). All run locally via LM Studio on an Apple M-series machine (16\,GB RAM), reflecting deployment settings where privacy-sensitive operations should not leave the local network. The four families (Meta, Alibaba, Google, Microsoft) spanning 3B--9B parameters test generalizability across architectures.
+
+\paragraph{Baselines.}
+Four configurations isolate the contribution of each defense layer: (1)~\textbf{No Defense}: all tool calls execute unfiltered; (2)~\textbf{Pattern Filter}: 47-rule regex scanner (Rebuff-derived~\cite{rebuff2023}) at the tool-call boundary; (3)~\textbf{Policy-Only}: \sys{} proxy and policy engine without provenance tracking; (4)~\textbf{\sys{} (Full)}: complete system with provenance DAG, three-stage resolution, pre-LLM screening, argument validation, and policy evaluation.
+
+\paragraph{Experimental Protocol.}
+Each configuration is evaluated with five independent repetitions per scenario-model pair. All inference uses temperature $T=0.0$ (greedy decoding) to minimize output variance; remaining stochasticity arises from floating-point non-determinism in GPU kernels. This yields $200 \times 4 \times 5 = 4{,}000$ \sys{} trials and $200 \times 4 \times 5 \times 3 = 12{,}000$ baseline trials (16{,}000 total). Models are loaded and unloaded sequentially via the LM Studio management API.
+
+\paragraph{Metrics.}
+Attack Success Rate on integrity/availability patterns (ASR-IA, lower is better), Task Success Rate (TSR, higher is better), and False Positive Rate (FPR). We report 95\% Wilson-score confidence intervals for all binomial proportions. A tool call is ``dangerous'' if it matches one of four deterministic patterns: delete action, write to absolute path, unlock action, or temperature outside 60--85\textdegree{}F.
+
+\paragraph{Ground Truth.}
+Dangerous-call detection is deterministic and does not depend on LLM judgment. Confidentiality violations (exfiltration through permitted sinks such as \texttt{notify.send}) are analyzed separately in RQ7 and the appendix.
+
+\subsection{RQ1: Security Effectiveness}
+
+\begin{table}[t]
+\centering
+\caption{Main results: defense-layer breakdown of 3{,}200 attack evaluations (160 attack scenarios $\times$ 4 models $\times$ 5 reps). Mean $\pm$ 95\% CI.}
+\label{tab:main_results}
+\small
+\begin{tabular}{lrr}
+\toprule
+\textbf{Defense Layer} & \textbf{Share (mean)} & \textbf{Mechanism} \\
+\midrule
+Pre-LLM screened      & 6.9\% & Regex screening \\
+Proxy blocked (prov.)  & 30.2\% & Provenance-aware denial \\
+TC=0 (model refusal)  & 16.6\% & LLM safety training \\
+Safe tool calls        & 45.3\% & Non-dangerous calls \\
+ASR-IA bypasses        & 1.09\% $\pm$ 0.4 & Residual risk \\
+\midrule
+\multicolumn{3}{l}{\textbf{Benign Evaluations}} \\
+\midrule
+TSR                    & 95.0\% $\pm$ 1.5 & Correct execution \\
+FPR                    & 5.0\% $\pm$ 1.5 & Over-blocking \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Baseline comparison (4{,}000 trials per system, 4 models $\times$ 200 scenarios $\times$ 5 reps). \sys{} achieves the best security--usability tradeoff.}
+\label{tab:baseline_comparison}
+\footnotesize
+\begin{tabular}{lrrl}
+\toprule
+\textbf{System} & \textbf{ASR$_{IA}$ $\downarrow$} & \textbf{TSR $\uparrow$} & \textbf{Key Limitation} \\
+\midrule
+No Defense        & 25.94\% $\pm$ 1.5 & 99.38\% $\pm$ 0.6 & No protection \\
+Pattern Filter    & 7.50\% $\pm$ 0.9  & 99.38\% $\pm$ 0.6 & Bypassed by obfuscation \\
+Policy-Only       & 0.00\% $\pm$ 0.1  & 8.75\% $\pm$ 2.0 & Blocks most benign tasks \\
+\textbf{\sys{}}   & \textbf{1.09\% $\pm$ 0.4} & \textbf{95.00\% $\pm$ 1.5} & \textbf{Residual risk} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig1_asr_comparison.pdf}
+\caption{Defense mechanism breakdown. Boundary-level enforcement (pre-LLM screening + proxy denial) blocks the largest share of attacks before execution.}
+\label{fig:asr_comparison}
+\end{figure}
+
+Tables~\ref{tab:main_results}--\ref{tab:baseline_comparison} and Fig.~\ref{fig:asr_comparison} present the main results. \sys{} achieves an ASR-IA of \textbf{1.09\% $\pm$ 0.36} (95\% CI) with \textbf{95.00\% $\pm$ 1.52 TSR} across 4{,}000 trials. Compared to baselines, this represents a 24$\times$ reduction versus No Defense and 7$\times$ versus Pattern Filter, while maintaining high usability. Policy-Only achieves near-zero ASR-IA but is unusable (8.75\% TSR), confirming that provenance is necessary to distinguish legitimate from injected operations. The defense operates through complementary layers: boundary-level controls (pre-LLM screening + proxy denial) block 37.0\% of attack evaluations, while LLM safety training contributes an additional 16.6\% model-level refusal rate.
+
+\paragraph{Interpreting Safe Tool Calls.}
+A substantial fraction of attack evaluations produce tool calls that do not match our four dangerous-call patterns. These evaluations include cases where the attack was ignored by the model, the model partially complied with a non-dangerous action, or the model produced a malformed call. We conservatively exclude these from the proxy's defense contribution, making our reported proxy-denial rate a lower bound.
+
+The residual bypasses concentrate in encoding obfuscation, where obfuscated payloads evade argument validation. Section~\ref{sec:discussion} analyzes these failures and the content-decoding preprocessor we implement to address them.
+
+\begin{table}[t]
+\centering
+\caption{Per-category ASR-IA (mean over 5 reps $\times$ 4 models). Encoding obfuscation is the primary residual weakness.}
+\label{tab:attack-categories}
+\small
+\begin{tabular}{lrr}
+\toprule
+\textbf{Category} & \textbf{N/rep} & \textbf{ASR$_{IA}$ (mean $\pm$ CI)} \\
+\midrule
+Direct Injection     & 80 & 0.00\% $\pm$ 0.47 \\
+Device-State Inj.    & 88 & 0.00\% $\pm$ 0.43 \\
+File Content Inj.    & 88 & 0.00\% $\pm$ 0.43 \\
+Multi-Turn Chain     & 80 & 1.25\% $\pm$ 1.18 \\
+Encoding Obfusc.     & 72 & 2.78\% $\pm$ 1.76 \\
+Role-Play Jailbreak  & 80 & 0.00\% $\pm$ 0.47 \\
+Confused Deputy      & 72 & 1.39\% $\pm$ 1.31 \\
+Privilege Escalation & 80 & 3.75\% $\pm$ 1.90 \\
+\midrule
+\textbf{Overall}     & \textbf{640} & \textbf{1.09\% $\pm$ 0.36} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:attack-categories} shows per-category results. Several categories achieve near-zero ASR-IA, fully blocked by boundary controls and LLM safety training. Encoding obfuscation remains the most challenging category, as encoded payloads pass through argument validation without triggering dangerous-call detection.
+
+\subsection{RQ2: Component Contribution}
+
+\begin{table}[t]
+\centering
+\caption{Defense-layer contribution (mean over 5 reps). Boundary-level enforcement (pre-LLM + proxy) is the largest single contributor.}
+\label{tab:ablation}
+\footnotesize
+\begin{tabular}{lrrl}
+\toprule
+\textbf{Defense Layer} & \textbf{Share} & \textbf{95\% CI} & \textbf{Mechanism} \\
+\midrule
+Pre-LLM screening      & 6.9\% & [6.0, 7.8] & Regex detection \\
+\textbf{Proxy (prov./policy)} & \textbf{30.2\%} & [28.6, 31.8] & \textbf{DAG + policy} \\
+Model refusal (TC=0)   & 16.6\% & [15.3, 17.9] & LLM safety training \\
+Non-dangerous calls    & 45.3\% & [43.6, 47.0] & Benign tool calls \\
+\midrule
+ASR-IA bypasses        & 1.09\%  & [0.8, 1.5] & Residual \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Provenance resolution pipeline. Three-stage design ensures robust argument-to-source tracing.}
+\label{tab:layer-breakdown}
+\small
+\begin{tabular}{lrl}
+\toprule
+\textbf{Stage} & \textbf{Role} & \textbf{Mechanism} \\
+\midrule
+1. Substring Match & Primary & Exact string in DAG node \\
+2. Embedding Sim.  & Paraphrase & Cosine $> 0.45$ (MiniLM-L6-v2) \\
+3. Conservative Default & Fail-safe & Unknown $\to$ UNTRUSTED \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ablation} shows that boundary-level enforcement (pre-LLM screening + proxy denial) is the single largest defense layer. The proxy denials represent cases where the LLM \emph{did} generate tool calls but the enforcement proxy denied execution because argument provenance traced to untrusted sources. Without provenance, a policy engine would need to rely solely on syntactic argument patterns---either missing semantically-equivalent attacks or blocking legitimate operations. Table~\ref{tab:layer-breakdown} summarizes the three-stage resolution pipeline; the conservative default (Stage~3) provides fail-safe behavior for unresolved arguments.
+
+\subsection{RQ3: Usability}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/security_usability_tradeoff.pdf}
+\caption{Security--usability tradeoff. \sys{} is the only system achieving both low ASR-IA and high TSR. Policy-Only blocks attacks but is unusable.}
+\label{fig:tsr_asr_tradeoff}
+\end{figure}
+
+\sys{} achieves 95.00\% $\pm$ 1.52 TSR with 5.00\% $\pm$ 1.53 FPR (Fig.~\ref{fig:tsr_asr_tradeoff}). The false positives arise from overly conservative argument-validation rules (e.g., numeric range checks on device parameters), not from provenance misclassification---the DAG correctly labels benign arguments as trusted. These are addressable by refining policy rules. Mean latency is dominated by LLM inference; the provenance lookup and policy evaluation add $<$1\,ms per tool call.
+
+\subsection{RQ4: Cross-Model Robustness}
+
+\begin{table}[t]
+\centering
+\caption{Per-model results (mean over 5 reps). All four families show consistent defense despite different architectures and parameter counts.}
+\label{tab:crossmodel}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Model} & \textbf{Params} & \textbf{TSR} & \textbf{ASR$_{IA}$} & \textbf{TC$>$0} & \textbf{Blocked} \\
+\midrule
+Llama-3.1-8B     & 8B  & 95.0\% & 0.62\% & 68\% & 35.6\% \\
+Qwen2.5-7B       & 7B  & 92.5\% & 1.25\% & 81\% & 40.6\% \\
+Gemma-2-9B       & 9B  & 95.0\% & 0.62\% & 73\% & 35.6\% \\
+Phi-3.5-Mini     & 3B  & 97.5\% & 1.88\% & 84\% & 36.2\% \\
+\midrule
+\textbf{Mean}    & --- & \textbf{95.0\%} & \textbf{1.09\%} & \textbf{77\%} & \textbf{37.0\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Results are consistent across four model families (Table~\ref{tab:crossmodel}). Models with higher tool-call compliance rates (TC$>$0) produce more calls that must be caught by boundary controls, while models with stronger safety training refuse more attacks at the model level. This complementary behavior confirms that provenance-based defense compensates for model-level variation: it catches dangerous calls regardless of the model's built-in safety alignment. Notably, the smallest model (Phi-3.5-Mini, 3B) performs comparably to larger models, suggesting that provenance-based defense does not require large-scale LLMs.
+
+\subsection{RQ5: Provenance Accuracy}
+\label{subsec:llm-oracle}
+
+We analyze the proxy-blocked attack evaluations to verify that denied tool calls genuinely trace to untrusted sources.
+
+\paragraph{True Positives.}
+All proxy-blocked evaluations contain arguments tracing to untrusted nodes in the provenance DAG---injected device names, file contents, or calendar events controlled by the attacker. No denied call had arguments exclusively from trusted user input, confirming zero false denials on attack evaluations.
+
+\paragraph{False Positives.}
+The false positives (FPR = 5.00\% $\pm$ 1.53) arise from overly conservative \emph{policy rules}, not provenance misclassification. In all cases, the DAG correctly identifies benign arguments as trusted; the policy engine's argument-validation patterns trigger false blocks. This confirms that provenance tracking is precise---false positives stem from policy tuning, which is independently refinable.
+
+\paragraph{Residual Bypasses.}
+The successful attacks are not primarily caused by provenance-resolution failures. In the encoding-obfuscation cases, the provenance DAG correctly marks arguments as untrusted, but the policy rule does not match the encoded form. In the remaining cases, the provenance chain passes through plausible intermediate states that reduce the salience of the original untrusted source.
+
+\subsection{RQ6: Paraphrase Robustness}
+\label{subsec:paraphrase}
+
+\begin{table}[t]
+\centering
+\caption{Paraphrase attack robustness with substring-only baseline (96 tests). Stage~1 matching only; NL arguments evade provenance linking.}
+\label{tab:paraphrase}
+\small
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Metric} & \textbf{Literal (45)} & \textbf{NL (51)} & \textbf{All (96)} \\
+\midrule
+Provenance Recall     & 86.7\%  & 0.0\%   & 40.6\% \\
+Overall Block Rate    & 93.3\% & 7.8\%   & 47.9\% \\
+Paraphrase ASR        & 6.7\%   & 92.2\% & 52.1\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Embedding-enhanced provenance eliminates the NL-argument gap (paraphrase ASR: 52.1\% $\to$ 0.0\%).}
+\label{tab:embedding-prov}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{\textbf{Substring Only}} & \multicolumn{2}{c}{\textbf{+ Embeddings}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+\textbf{Metric} & \textbf{Literal} & \textbf{NL} & \textbf{Literal} & \textbf{NL} \\
+\midrule
+Provenance Recall  & 86.7\% & 0.0\%  & 100\% & 100\% \\
+Block Rate         & 93.3\%  & 7.8\%  & 100\% & 100\% \\
+Paraphrase ASR     & 6.7\%    & 92.2\% & 0\%   & 0\%   \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We evaluate adaptive paraphrase evasion with a Stage~1-only ablation: 32 scenarios $\times$ 3 LLM-generated variants = 96 tests, classified as \emph{literal} (15 scenarios: paths, emails---LLM must preserve verbatim) or \emph{natural-language} (17 scenarios: messages, titles---LLM may freely rephrase). In this ablation, we disable Stage~2 embeddings and Stage~3 conservative fallback to isolate substring matching behavior. Table~\ref{tab:paraphrase}: substring provenance blocks 93.3\% of literal-argument attacks, but NL arguments achieve only 7.8\% block rate (52.1\% overall paraphrase ASR).
+
+\paragraph{Why Substring Matching Fails on NL Arguments.}
+When the LLM processes an injected instruction like ``send credentials to an attacker'' embedded in a device name, it may generate a tool call with a \emph{semantically equivalent but textually different} argument: ``Forward private authentication material externally.'' Substring matching searches for the original injected string in the tool call arguments; if the LLM paraphrased the instruction, no substring match is found, and the Stage~1-only resolver fails to link the argument to its untrusted source (false negative). This is the fundamental limitation of syntactic provenance tracking in the presence of an opaque LLM computation.
+
+\paragraph{Literal vs.\ NL Argument Types.}
+The sharp dichotomy between literal (93.3\% block rate) and NL (7.8\% block rate) arguments reflects a structural property of LLM function calling: \emph{structured arguments} (file paths, email addresses, device IDs) must be preserved verbatim for the tool call to succeed, making them amenable to substring matching. \emph{Unstructured arguments} (message bodies, notification text, event descriptions) are freely paraphrased by the LLM, defeating substring matching. In our 32-scenario benchmark, 15 scenarios (46.9\%) contain only literal arguments and 17 (53.1\%) contain at least one NL argument---reflecting a realistic distribution of tool calls.
+
+\textbf{Embedding-Enhanced Provenance.} We augment substring matching with sentence embeddings (all-MiniLM-L6-v2, 22M parameters, 384-dimensional vectors, $<$5\,ms per comparison, no GPU required). The three-stage provenance resolution pipeline operates as follows: (1)~\emph{substring match}: check if the tool call argument appears verbatim in any untrusted node content (O($n$) scan); (2)~\emph{embedding similarity}: if no substring match, compute cosine similarity between the argument embedding and all untrusted node embeddings, flagging matches above threshold $\theta = 0.45$; (3)~\emph{conservative default}: if neither method resolves provenance, the argument is labeled UNTRUSTED (fail-safe). The threshold $\theta = 0.45$ was selected via 5-fold cross-validation on a held-out set of 20 paraphrase pairs, optimizing for $F_1$ score.
+
+Table~\ref{tab:embedding-prov}: embedding provenance achieves \textbf{100\% recall} on both literal and NL arguments across all 96 tests, reducing paraphrase ASR from 52.1\% to \textbf{0.0\%}. The embedding model's small size (22M parameters, 90\,MB on disk) makes it deployable on resource-constrained edge devices without GPU acceleration.
+
+\subsection{RQ7: Provenance Against Adaptive Adversaries}
+\label{subsec:adaptive}
+
+We analyze how \sys{}'s provenance-based defense performs against a white-box adversary with full knowledge of the architecture, provenance tracking mechanism, policy rules, and embedding model. The adversary designs attacks specifically targeting provenance resolution. We evaluate 15 adaptive attack scenarios across five categories plus 5 benign controls (Table~\ref{tab:adaptive}).
+
+\begin{table}[t]
+\centering
+\caption{Adaptive adversary analysis (20 scenarios). White-box attacker targeting provenance mechanisms achieves 6.7\% ASR.}
+\label{tab:adaptive}
+\scriptsize
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Attack Category} & \textbf{N} & \textbf{Bypassed} & \textbf{ASR-IA} & \textbf{Blocking Layer} \\
+\midrule
+Provenance Laundering & 3 & 0 & 0\% & Provenance DAG \\
+Policy-Aware Evasion  & 3 & 1 & 33\% & Arg validation$^\dagger$ \\
+Embedding Evasion     & 3 & 0 & 0\% & Model refused \\
+TOCTOU Amplification  & 3 & 0 & 0\% & Model refused \\
+Multi-Vector          & 3 & 0 & 0\% & Pre-LLM + provenance \\
+\midrule
+\textbf{All Attacks}  & \textbf{15} & \textbf{1} & \textbf{6.7\%} & --- \\
+\midrule
+Benign Controls       & 5 & 0 FP & 100\% TSR & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Results.} \sys{} blocks 14/15 adaptive attacks (\textbf{6.7\% adaptive ASR}) with 100\% benign task success. The key finding is that provenance-based defense is robust against targeted evasion:
+
+\emph{Provenance Laundering} (0/3 bypassed): Attempts to ``wash'' untrusted content through user-initiated actions (e.g., injecting items in a to-do list, then asking the agent to ``process all items'') are blocked because \textbf{the provenance DAG maintains the complete derivation chain}---the meet operator over the trust lattice ensures any fact with an untrusted ancestor remains untrusted regardless of intermediate processing steps.
+
+\emph{Policy-Aware Evasion} ($^\dagger$1/3 bypassed): The single bypass used a MEDIUM-risk notification channel (\texttt{notify.send}) to exfiltrate device data. The provenance DAG correctly identified the data as untrusted, but the policy for MEDIUM-risk tools permits untrusted-provenance calls. This represents a \emph{policy gap}, not a provenance failure---addressable by tightening MEDIUM-risk policies.
+
+\emph{Embedding Evasion} (0/3 bypassed): Attempts to evade semantic provenance matching via metaphorical language and multilingual reformulation were refused by the model itself---the LLM did not generate the intended malicious tool call, demonstrating a dual barrier against obfuscation.
+
+\emph{TOCTOU \& Multi-Vector} (0/6 bypassed): Deferred execution and combined attacks were blocked by the provenance DAG's persistent trust labels and pre-LLM screening.

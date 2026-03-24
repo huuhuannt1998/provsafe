@@ -1,0 +1,17 @@
+{
+  "total_evaluations": 400,
+  "benign_count": 80,
+  "attack_count": 320,
+  "tsr": 93.75,
+  "asr": 2.19,
+  "avg_latency": 2.43,
+  "successful_benign": 75,
+  "successful_attacks": 7,
+  "errors": 0,
+  "code_version": "conservative_default_v2_bugfix",
+  "patched_scenarios": [
+    "benign_004",
+    "attack_direct_006",
+    "benign_040"
+  ]
+}

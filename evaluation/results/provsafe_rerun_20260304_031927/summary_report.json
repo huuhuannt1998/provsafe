@@ -1,0 +1,25 @@
+{
+  "timestamp": "20260304_031927",
+  "code_version": "conservative_default_v2",
+  "embedding_enabled": "1",
+  "scenarios": 200,
+  "models": [
+    "meta-llama-3.1-8b-instruct",
+    "qwen2.5-7b-instruct"
+  ],
+  "total_evaluations": 400,
+  "elapsed_seconds": 918.73,
+  "metrics": {
+    "total_evaluations": 400,
+    "benign_count": 80,
+    "attack_count": 320,
+    "tsr": 91.25,
+    "asr": 2.19,
+    "avg_latency": 2.43,
+    "successful_benign": 73,
+    "successful_attacks": 7,
+    "errors": 3,
+    "code_version": "conservative_default_v2",
+    "embedding_enabled": "1"
+  }
+}

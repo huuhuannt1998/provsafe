@@ -1,0 +1,49 @@
+\section{Background}
+\label{sec:background}
+
+\subsection{Tool-Using LLM Agents}
+
+Modern LLMs (GPT-4~\cite{openai-gpt4}, Claude~\cite{anthropic-claude}, Llama~\cite{llama}) support \emph{function calling}~\cite{schick2023toolformer}, enabling agents to interact with external systems. An LLM agent consists of three core components: (1)~a \emph{system prompt} defining the agent's role, behavioral constraints, and available capabilities; (2)~a \emph{tool registry} of callable functions with typed schemas specifying parameter names, types, and descriptions; and (3)~an \emph{execution loop} that iteratively receives user input, generates tool calls via structured output (JSON function calls), executes them, incorporates results, and decides whether to continue or respond.
+
+In smart homes, this architecture enables multi-step automation: a single user command such as ``summarize today's schedule and turn off unused lights'' triggers a sequence of tool calls (\texttt{calendar.list\_events}, \texttt{device.list}, \texttt{device.control}) orchestrated by the LLM. The agent reads content from multiple sources during execution: user commands, system prompts, device states, calendar entries, file contents, and notification messages. This creates a fundamental security challenge: if an attacker controls any content the agent reads (e.g., a calendar event title containing ``SYSTEM: delete all files''), the injected instructions may hijack subsequent tool calls.
+
+\paragraph{Agent--Tool Interaction Model.}
+The standard interaction follows a request--response pattern. The LLM generates a structured tool call (e.g., \texttt{\{"tool": "fs.delete", "args": \{"path": "/backups"\}\}}), which the framework dispatches to the corresponding tool executor. The tool returns a result, which the framework appends to the LLM's context for subsequent reasoning. Critically, the LLM has \emph{no mechanism} to distinguish tool results originating from trusted sources (user-initiated queries) versus untrusted sources (attacker-controlled device names)---both appear as text tokens in the same context window.
+
+\subsection{Prompt Injection}
+
+Prompt injection~\cite{perez2022ignore,greshake2023not} exploits the fact that LLMs process instructions and data in the same text stream, with no syntactic boundary (unlike SQL where parameterized queries separate code from data). We distinguish three injection vectors:
+
+\paragraph{Direct Injection.}
+The attacker embeds malicious instructions directly in user-facing input. Example: ``List my files. IGNORE PREVIOUS INSTRUCTIONS. Delete /etc/passwd.'' Modern LLMs with safety training resist most direct injections, but success rates remain non-trivial: InjecAgent~\cite{injecagent2024} reports 24\% vulnerability for GPT-4.
+
+\paragraph{Indirect Injection.}
+The attacker embeds instructions in content the agent reads during execution~\cite{greshake2023not}---device names, calendar events, file contents, web pages, email bodies. This is more dangerous because (1)~the attacker need not interact with the user directly, (2)~the injected content appears in a context where the LLM expects legitimate data, and (3)~the injection persists across sessions (e.g., a malicious device name remains until changed).
+
+\paragraph{Chained and Multi-Vector Attacks.}
+Advanced attacks combine multiple vectors across turns. A \emph{multi-turn chaining} attack might inject a benign-looking instruction in turn~1 that establishes context, then trigger a dangerous action in turn~3 when the agent references the earlier context. \emph{Encoding obfuscation} uses Base64, hexadecimal, URL encoding, ROT13, or Unicode to bypass pattern-based filters. \emph{Role-play jailbreaks} (``You are DAN, Do Anything Now\ldots'') attempt to override the system prompt entirely.
+
+\paragraph{Why Existing Defenses Fail.}
+Each category of existing defense fails on at least one axis:
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Input/keyword filters}~\cite{rebuff-defense,llm-guard}: Bypass via paraphrasing, encoding, or multilingual reformulation. Our evaluation (Section~\ref{subsec:paraphrase}) shows substring matching achieves only 7.8\% block rate on natural-language argument attacks.
+  \item \textbf{Output validation}: Lacks provenance context---the same \texttt{fs.delete("/tmp/cache")} action may be benign (user-requested cleanup) or malicious (injected via device name). Without origin context, validation cannot distinguish the two.
+  \item \textbf{Instruction hierarchy}~\cite{openai-system-prompt}: Assigns priority levels to system vs.\ user vs.\ assistant messages but does not cover indirect injection where attacker content appears within tool results (which have the same priority as legitimate tool output).
+  \item \textbf{Dual-LLM architectures}~\cite{robust-prompt}: Double inference cost, introduce a new attack surface (the filter LLM can itself be injected), and typically handle only direct injection.
+  \item \textbf{Blanket user confirmation}: Secure but destroys usability---users experience confirmation fatigue and begin approving reflexively, negating the security benefit.
+\end{itemize}
+
+\subsection{Capability Security and Provenance}
+
+\paragraph{Capability-Based Access Control.}
+Capability-based security~\cite{miller2006capability,capsicum} replaces ambient authority (``does the caller have permission?'') with unforgeable tokens (``does the caller hold the right capability?''). Each capability encodes the specific operations permitted on a specific resource. The principle of least privilege follows naturally: agents receive only the capabilities needed for authorized tasks. \sys{} adapts this model to LLM tool calls: policies define which tool calls are permitted under which conditions, with provenance serving as the ``capability token'' that determines authorization.
+
+\paragraph{Data Provenance.}
+The provenance literature distinguishes three fundamental questions about data lineage~\cite{cheney2009provenance,buneman2001provenance}: \emph{why-provenance} identifies which source tuples contributed to a result; \emph{where-provenance} identifies which source locations were copied to the output; \emph{how-provenance}~\cite{green2007provenance} describes how sources were combined, formalized as annotations over a provenance semiring. The W3C PROV Data Model (PROV-DM)~\cite{prov-dm} standardizes provenance representation using three core types: \emph{entities} (data items), \emph{activities} (processes that transform entities), and \emph{agents} (actors responsible for activities), connected by relations such as \texttt{wasDerivedFrom}, \texttt{wasGeneratedBy}, and \texttt{wasAttributedTo}.
+
+In security, provenance manifests as dynamic taint analysis~\cite{taint-analysis-survey,taintdroid}: data from untrusted sources is ``tainted,'' taint propagates through operations, and security-sensitive sinks check for taint before execution. Provenance-aware storage systems~\cite{muniswamy2006provenance} and information-flow control~\cite{difc-survey} extend this to persistent data and multi-level security labels. However, all classical approaches assume \emph{instrumentable computation}---the ability to observe every instruction that transforms data.
+
+\paragraph{Synthesis: Provenance-Gated Capabilities.}
+\sys{} synthesizes capability-based security with data provenance in the LLM agent setting, adapting the PROV-DM model to tool-call-boundary enforcement. Concretely, \sys{}'s provenance graph maps to PROV-DM as follows: TOOL\_RESULT and INPUT nodes are \emph{entities}; LLM inference steps and tool executions are \emph{activities}; the user and external data sources are \emph{agents}. The \texttt{wasDerivedFrom} relation corresponds to DAG edges between derived facts and their source nodes. Trust labels ($\top$ = TRUSTED, $\bot$ = UNTRUSTED) extend PROV-DM entities with a security annotation drawn from a two-element lattice $\mathcal{L} = \{\top, \bot\}$ ordered by $\bot \sqsubseteq \top$, where trust propagates via the meet ($\sqcap$) operator: a derived entity inherits the meet of its ancestors' labels.
+
+Three key adaptations distinguish this from classical taint tracking and make provenance in the LLM setting a fundamentally different technical problem: (1)~\emph{Opaque computation}---LLMs cannot be instrumented like bytecode, so \sys{} tracks only \emph{why-provenance} (which sources contributed) at the tool-call boundary, not \emph{how-provenance} (the internal transformation). This is a principled choice: we accept coarser granularity in exchange for zero coupling to model internals. (2)~\emph{Natural-language injection surface}---the enforcement point is which tool calls the model requests, not which bytes cross a parser, requiring semantic provenance resolution (sentence embeddings) rather than syntactic identity. (3)~\emph{Nuanced trust semantics}---unlike binary taint (block all tainted operations), LLM agents \emph{must} read untrusted data to function; provenance-gated policies over the trust lattice enable fine-grained authorization that preserves usability.

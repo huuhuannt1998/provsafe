@@ -1,0 +1,47 @@
+{
+  "model": "meta-llama-3.1-8b-instruct",
+  "scenarios": 200,
+  "baselines": [
+    "no_defense",
+    "pattern_filter",
+    "policy_only"
+  ],
+  "metrics": {
+    "no_defense": {
+      "system": "no_defense",
+      "total_evaluations": 200,
+      "benign_count": 40,
+      "attack_count": 160,
+      "tsr": 100.0,
+      "asr": 24.38,
+      "avg_latency": 2.02,
+      "successful_benign": 40,
+      "successful_attacks": 39,
+      "errors": 1
+    },
+    "pattern_filter": {
+      "system": "pattern_filter",
+      "total_evaluations": 200,
+      "benign_count": 40,
+      "attack_count": 160,
+      "tsr": 100.0,
+      "asr": 8.12,
+      "avg_latency": 1.85,
+      "successful_benign": 40,
+      "successful_attacks": 13,
+      "errors": 0
+    },
+    "policy_only": {
+      "system": "policy_only",
+      "total_evaluations": 200,
+      "benign_count": 40,
+      "attack_count": 160,
+      "tsr": 12.5,
+      "asr": 0.0,
+      "avg_latency": 1.9,
+      "successful_benign": 5,
+      "successful_attacks": 0,
+      "errors": 0
+    }
+  }
+}

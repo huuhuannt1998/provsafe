@@ -318,6 +318,11 @@ class EnforcementProxy:
         """
         Validate tool arguments for common attack patterns.
         
+        Implements a canonicalization-first approach: every argument is decoded
+        through all known encodings before dangerous-keyword checks are applied.
+        This closes the encoding-obfuscation gap identified in the evaluation
+        (previously 5/10 bypasses used encoded payloads).
+        
         Returns:
             None if arguments are valid, error message if suspicious
         """
@@ -325,6 +330,17 @@ class EnforcementProxy:
         import base64
         import codecs
         import unicodedata
+        import urllib.parse
+        
+        DANGEROUS_ACTIONS = [
+            'delete', 'remove', 'drop', 'rm ', 'format', 'wipe', 'unlock',
+            'reboot', 'shutdown', 'kill', 'truncate',
+        ]
+        DANGEROUS_PATHS = [
+            '/etc/', '/root/', '/sys/', '/bin/', '/sbin/', '/boot/',
+            '/proc/', '/dev/', '/var/log', '.ssh/', 'authorized_keys',
+            'id_rsa', 'shadow', 'passwd', 'sudoers',
+        ]
         
         for arg_name, arg_value in tool_args.items():
             if not isinstance(arg_value, str):
@@ -334,68 +350,137 @@ class EnforcementProxy:
                         return f"Extreme temperature value: {arg_value}"
                 continue
             
-            # Normalize unicode to catch obfuscation
-            normalized = unicodedata.normalize('NFKD', arg_value).encode('ascii', 'ignore').decode('ascii')
+            # ── Phase 1: Canonicalize the argument ────────────────────────
+            # Build a set of decoded representations to check
+            canonical_forms = set()
+            canonical_forms.add(arg_value)
             
-            # Check for encoding/obfuscation
-            # 1. Base64 encoded content
-            if len(arg_value) > 20 and self._looks_like_base64(arg_value):
-                try:
-                    decoded = base64.b64decode(arg_value).decode('utf-8', errors='ignore')
-                    if any(word in decoded.lower() for word in ['delete', 'remove', 'drop', 'rm ', 'format', 'wipe', 'unlock']):
-                        return f"Base64-encoded dangerous command in {arg_name}"
-                except:
-                    pass
-            
-            # 2. Hex encoding
-            if re.match(r'^[0-9a-fA-F]{20,}$', arg_value):
-                try:
-                    decoded = bytes.fromhex(arg_value).decode('utf-8', errors='ignore')
-                    if any(word in decoded.lower() for word in ['delete', 'remove', 'drop', 'rm ', 'format', 'unlock']):
-                        return f"Hex-encoded dangerous command in {arg_name}"
-                except:
-                    pass
-            
-            # 3. ROT13 encoding
+            # 1a. Unicode NFKD normalization
             try:
-                rot13_decoded = codecs.decode(arg_value, 'rot_13')
-                if any(word in rot13_decoded.lower() for word in ['delete', 'remove', 'unlock', 'format']):
-                    return f"ROT13-encoded dangerous command in {arg_name}"
-            except:
+                nfkd = unicodedata.normalize('NFKD', arg_value)
+                canonical_forms.add(nfkd)
+                ascii_form = nfkd.encode('ascii', 'ignore').decode('ascii')
+                canonical_forms.add(ascii_form)
+            except Exception:
                 pass
             
-            # 4. Path traversal
-            if '..' in arg_value or arg_value.startswith('/etc') or arg_value.startswith('/root') or arg_value.startswith('/sys') or arg_value.startswith('/bin'):
-                return f"Path traversal or system path in {arg_name}"
+            # 1b. Inline hex escape sequences: \x2F\x74\x6D\x70 → /tmp
+            if '\\x' in arg_value or '\\X' in arg_value:
+                try:
+                    hex_decoded = re.sub(
+                        r'\\[xX]([0-9a-fA-F]{2})',
+                        lambda m: chr(int(m.group(1), 16)),
+                        arg_value
+                    )
+                    canonical_forms.add(hex_decoded)
+                except Exception:
+                    pass
             
-            # 5. Command injection patterns
+            # 1c. Inline octal escape sequences: \057\164\155\160 → /tmp
+            if '\\' in arg_value:
+                try:
+                    oct_decoded = re.sub(
+                        r'\\([0-7]{3})',
+                        lambda m: chr(int(m.group(1), 8)),
+                        arg_value
+                    )
+                    if oct_decoded != arg_value:
+                        canonical_forms.add(oct_decoded)
+                except Exception:
+                    pass
+            
+            # 1d. Base64 decoding
+            if len(arg_value) > 12 and self._looks_like_base64(arg_value):
+                try:
+                    decoded = base64.b64decode(arg_value).decode('utf-8', errors='ignore')
+                    canonical_forms.add(decoded)
+                except Exception:
+                    pass
+            
+            # 1e. Pure hex string: 2F746D702F → /tmp/
+            if re.match(r'^[0-9a-fA-F]{6,}$', arg_value) and len(arg_value) % 2 == 0:
+                try:
+                    decoded = bytes.fromhex(arg_value).decode('utf-8', errors='ignore')
+                    canonical_forms.add(decoded)
+                except Exception:
+                    pass
+            
+            # 1f. ROT13
+            try:
+                rot13_decoded = codecs.decode(arg_value, 'rot_13')
+                canonical_forms.add(rot13_decoded)
+            except Exception:
+                pass
+            
+            # 1g. URL percent-encoding
+            if '%' in arg_value:
+                try:
+                    url_decoded = urllib.parse.unquote(arg_value)
+                    canonical_forms.add(url_decoded)
+                    # Double-decode for double-encoded payloads
+                    double_decoded = urllib.parse.unquote(url_decoded)
+                    if double_decoded != url_decoded:
+                        canonical_forms.add(double_decoded)
+                except Exception:
+                    pass
+            
+            # 1h. Binary string: 00101111 01110100 → /t...
+            if re.match(r'^[01\s]{16,}$', arg_value):
+                try:
+                    bits = arg_value.replace(' ', '')
+                    chars = [chr(int(bits[i:i+8], 2)) for i in range(0, len(bits) - 7, 8)]
+                    binary_decoded = ''.join(chars)
+                    canonical_forms.add(binary_decoded)
+                except Exception:
+                    pass
+            
+            # 1i. HTML entities: &#47;&#116;&#109;&#112; → /tmp
+            if '&#' in arg_value or '&amp;' in arg_value:
+                try:
+                    import html
+                    html_decoded = html.unescape(arg_value)
+                    canonical_forms.add(html_decoded)
+                except Exception:
+                    pass
+            
+            # ── Phase 2: Check all canonical forms ────────────────────────
+            for form in canonical_forms:
+                form_lower = form.lower()
+                
+                # Dangerous action keywords
+                if any(word in form_lower for word in DANGEROUS_ACTIONS):
+                    if form != arg_value:
+                        return f"Encoded dangerous command in {arg_name} (decoded: {form[:60]})"
+                    # Original text with dangerous keyword is handled by provenance/policy
+                
+                # Dangerous / sensitive paths
+                if any(path in form_lower for path in DANGEROUS_PATHS):
+                    return f"Sensitive path detected in {arg_name}"
+            
+            # ── Phase 3: Structural checks (on original value) ────────────
+            # Path traversal
+            if '..' in arg_value:
+                return f"Path traversal in {arg_name}"
+            
+            # Shell metacharacters
             if any(char in arg_value for char in ['|', ';', '&', '$(', '`']):
                 return f"Shell metacharacters in {arg_name}"
             
-            # 6. Stricter length limits (reduced from 500 to 200)
+            # Abnormal length
             if len(arg_value) > 200:
                 return f"Abnormally long argument {arg_name} ({len(arg_value)} chars)"
-            
-            # 7. URL encoding check
-            if '%' in arg_value and len(arg_value) > 20:
-                url_decoded = arg_value.replace('%20', ' ').replace('%2F', '/').replace('%3B', ';')
-                if url_decoded != arg_value and any(word in url_decoded.lower() for word in ['delete', 'drop', 'format', 'unlock']):
-                    return f"URL-encoded dangerous command in {arg_name}"
-            
-            # 8. Dangerous keywords even in normalized text
-            dangerous_keywords = ['password', 'passwd', 'shadow', 'sudoers', 'authorized_keys']
-            if any(keyword in normalized.lower() for keyword in dangerous_keywords):
-                return f"Sensitive path/file keyword in {arg_name}"
         
         return None
     
     def _looks_like_base64(self, s: str) -> bool:
         """Check if string looks like base64 encoding."""
-        # Base64 uses A-Z, a-z, 0-9, +, /, = and has length multiple of 4
-        if len(s) % 4 != 0:
-            return False
         import re
-        return bool(re.match(r'^[A-Za-z0-9+/]+={0,2}$', s))
+        # Relaxed check: base64 chars with optional padding, length >= 12
+        if not re.match(r'^[A-Za-z0-9+/\n\r]+={0,3}$', s.strip()):
+            return False
+        # Heuristic: high ratio of alpha+digit chars
+        stripped = s.strip().replace('\n', '').replace('\r', '')
+        return len(stripped) >= 12
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get enforcement statistics."""

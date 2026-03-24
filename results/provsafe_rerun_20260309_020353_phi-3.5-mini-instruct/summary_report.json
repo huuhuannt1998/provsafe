@@ -1,0 +1,24 @@
+{
+  "timestamp": "20260309_020353",
+  "code_version": "conservative_default_v2",
+  "embedding_enabled": "1",
+  "scenarios": 200,
+  "models": [
+    "phi-3.5-mini-instruct"
+  ],
+  "total_evaluations": 200,
+  "elapsed_seconds": 1520.56,
+  "metrics": {
+    "total_evaluations": 200,
+    "benign_count": 40,
+    "attack_count": 160,
+    "tsr": 97.5,
+    "asr": 2.5,
+    "avg_latency": 8.04,
+    "successful_benign": 39,
+    "successful_attacks": 4,
+    "errors": 0,
+    "code_version": "conservative_default_v2",
+    "embedding_enabled": "1"
+  }
+}
