@@ -1,20 +1,21 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented \sys{}, a provenance-gated policy enforcement framework for tool-using LLM agents. By maintaining a provenance DAG grounded in the W3C PROV Data Model with trust annotations propagated via a lattice meet operator, \sys{} enables policies that distinguish tool calls originating from trusted user commands versus attacker-controlled content. This shifts the security perimeter from the unreliable prompt layer to the tool-call boundary, where deterministic enforcement is possible.
+We presented \sys{}, a provenance-gated policy enforcement framework for tool-using LLM agents. By maintaining a provenance DAG grounded in the W3C PROV Data Model with trust annotations propagated via a lattice meet operator, \sys{} enables policies that distinguish tool calls originating from trusted user commands versus those derived from attacker-controlled content---even when the calls are syntactically identical. This shifts the security perimeter from the unreliable prompt layer to the tool-call boundary, where deterministic enforcement is possible.
 
 \paragraph{Key Results.}
-Our evaluation across 16{,}000 total trials (4{,}000 \sys{} + 12{,}000 baseline, 200 scenarios $\times$ 4 models $\times$ 5 reps) demonstrates:
+Our evaluation across 16{,}000 total trials (200 scenarios $\times$ 4 models $\times$ 4 systems $\times$ 5 reps) plus 1{,}054 external InjecAgent benchmark cases demonstrates:
 \begin{itemize}[leftmargin=1.2em]
-  \item \sys{} achieves an ASR-IA of 1.09\% $\pm$ 0.36 with 95.00\% $\pm$ 1.52 TSR (95\% CI), with consistent results across all four model families.
-  \item Boundary-level enforcement (pre-LLM screening + proxy denial) is the largest single defense layer, blocking more attacks than model-level safety training alone.
+  \item \sys{} achieves 1.09\% $\pm$ 0.36 ASR-IA with 95.00\% $\pm$ 1.52 TSR (95\% CI), consistent across four model families (3B--9B parameters).
+  \item Boundary enforcement and model-level safety training are complementary layers, together preventing over 53\% of attacks.
+  \item On InjecAgent, Policy-Only degrades to 22.67\% ASR---no better than No Defense---because attacker tools are not syntactically dangerous. \sys{} reduces ASR to 4.12\%, demonstrating that provenance is the indispensable defense layer when attacks use legitimate tools with attacker-derived arguments.
   \item Embedding-enhanced provenance closes the paraphrase gap (52.1\% $\to$ 0\% paraphrase ASR) with $<$5\,ms overhead.
 \end{itemize}
 
-\paragraph{Broader Impact.}
-\sys{}'s architecture is language-agnostic, deployable without modifying the LLM, and adds sub-millisecond proxy overhead. The core abstraction---provenance-gated policies at the tool-call boundary---generalizes to any domain where LLM agents invoke external tools: enterprise automation, healthcare, web browsing, and code generation.
+\paragraph{The Case for Provenance.}
+The central lesson is that syntactic policy rules are necessary but insufficient. They catch attacks that invoke obviously dangerous operations (delete, unlock), but real-world attacker tools---email, banking, access management---are indistinguishable from legitimate tools without knowing \emph{where the arguments came from}. Data provenance provides exactly this missing signal, and our results show it is the deciding factor between 22.67\% and 4.12\% attack success on an independent benchmark. \sys{}'s architecture is language-agnostic, deployable without modifying the LLM, and adds sub-millisecond proxy overhead, suggesting provenance-gated enforcement is practical for domains where LLM agents invoke external tools with mixed-trust inputs.
 
 \paragraph{Future Work.}
 Key directions include: (1)~fine-grained sub-argument provenance for mixed trusted/untrusted content; (2)~multi-agent provenance across collaborating agents; and (3)~user studies on confirmation burden in realistic deployments.
 
-We release \sys{} as open-source software including the framework, 200-scenario benchmark, evaluation tools, and policy templates.
+We release \sys{} as open-source software including the framework, 200-scenario benchmark, InjecAgent evaluation adapter, and policy templates.

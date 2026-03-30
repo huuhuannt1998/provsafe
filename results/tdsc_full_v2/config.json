@@ -1,0 +1,20 @@
+{
+  "models": [
+    "meta-llama-3.1-8b-instruct",
+    "qwen2.5-7b-instruct",
+    "gemma-2-9b-it",
+    "phi-3.5-mini-instruct"
+  ],
+  "systems": [
+    "no_defense",
+    "pattern_filter",
+    "policy_only",
+    "provsafe"
+  ],
+  "n_scenarios": 200,
+  "n_reps": 5,
+  "temperature": 0.0,
+  "total_trials": 16000,
+  "timestamp": "20260326_150028",
+  "encoding_decoder": "v2_canonicalize"
+}

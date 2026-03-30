@@ -5,25 +5,38 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 env/
 *.egg-info/
 
-# Results - ENABLED for sharing evaluation results
-# evaluation/results/**/*.json
-# evaluation/results/**/*.csv
+# Large result checkpoint files (keep reports, skip raw data)
+results/*/checkpoint.json
+results/*/all_results.json
+evaluation/results/
 
 # Environment
 .env
+evaluation/.env
 .vscode/
 .idea/
 
-# LaTeX
+# Claude Code
+.claude/
+
+# LaTeX build artifacts
 *.aux
 *.log
 *.out
 *.synctex.gz
 *.fls
 *.fdb_latexmk
+*.bbl
+*.blg
+*.toc
 
 # macOS
 .DS_Store
+*.pages
+
+# Temporary
+*.tmp

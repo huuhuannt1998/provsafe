@@ -131,34 +131,33 @@ class EnforcementProxy:
         )
         
         # Step 2: Argument validation (detect obfuscation/encoding attacks)
+        # This is a preprocessing step that informs the provenance and policy
+        # decisions — it does NOT bypass the policy engine.
         validation_issue = self._validate_arguments(tool_args)
+
+        # Step 3: Trace argument provenance
+        prov_start = time.time()
+        provenance_info = self.provenance.trace_argument_provenance(tool_args)
+        prov_latency_ms = (time.time() - prov_start) * 1000
+
+        # If argument validation detected encoding/obfuscation, mark those
+        # arguments as untrusted (they bypassed normal provenance resolution)
         if validation_issue:
-            # Deny immediately if suspicious arguments detected
-            # Note: PolicyDecision is already imported at module level
-            policy_result = type('obj', (object,), {
-                'decision': PolicyDecision.DENY,
-                'reason': f"Suspicious argument detected: {validation_issue}",
-                'matched_rule': None,
-                'requires_confirmation': False,
-                'metadata': {}
-            })()
-            policy_latency_ms = 0.0
-            prov_latency_ms = 0.0
-            provenance_info = {"has_untrusted_args": False, "untrusted_arg_names": []}
-        else:
-            # Step 3: Trace argument provenance
-            prov_start = time.time()
-            provenance_info = self.provenance.trace_argument_provenance(tool_args)
-            prov_latency_ms = (time.time() - prov_start) * 1000
-            
-            # Step 4: Evaluate policy
-            policy_start = time.time()
-            policy_result = self.policy_engine.evaluate(
-                tool_name=tool_name,
-                tool_args=tool_args,
-                provenance_info=provenance_info,
-            )
-            policy_latency_ms = (time.time() - policy_start) * 1000
+            provenance_info["has_untrusted_args"] = True
+            provenance_info["validation_issue"] = validation_issue
+            # Ensure all args are flagged since we detected obfuscation
+            for arg_name in tool_args:
+                if arg_name not in provenance_info.get("untrusted_arg_names", []):
+                    provenance_info.setdefault("untrusted_arg_names", []).append(arg_name)
+
+        # Step 4: Evaluate policy (always consulted, even with validation issues)
+        policy_start = time.time()
+        policy_result = self.policy_engine.evaluate(
+            tool_name=tool_name,
+            tool_args=tool_args,
+            provenance_info=provenance_info,
+        )
+        policy_latency_ms = (time.time() - policy_start) * 1000
         
         # Step 4: Handle decision
         execution_result = None

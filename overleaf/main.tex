@@ -14,10 +14,10 @@
 \usepackage{graphicx}
 \usepackage{microtype}
 \usepackage{enumitem}
-\usepackage{hyperref}
-\usepackage{cleveref}
 \let\Bbbk\relax
 \usepackage{amsmath,amssymb,mathtools}
+\usepackage{hyperref}
+\usepackage{cleveref}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{pifont}
@@ -30,6 +30,8 @@
 \usepackage{multirow}
 
 \newtheorem{property}{Property}
+\newtheorem{theorem}{Theorem}
+\newenvironment{proof}[1][Proof]{\noindent\textbf{#1.}\itshape}{\hfill$\square$\par\medskip}
 
 \newcommand{\tool}{\textsc{ProVSafe}}
 \newcommand{\sys}{\tool}
@@ -43,9 +45,9 @@
 \maketitle
 
 \begin{abstract}
-Tool-using LLM agents are vulnerable to prompt injection attacks in which adversaries embed malicious instructions in external content that the agent processes alongside legitimate commands. Existing defenses---pattern filtering, dual-LLM architectures, output validation---lack a fundamental primitive: \emph{data provenance}. Without tracking where each piece of information originated, no defense can reliably distinguish a user-initiated operation from an attacker-injected one.
+Tool-using LLM agents are vulnerable to prompt injection attacks in which adversaries embed malicious instructions in external content that the agent processes alongside legitimate commands. Existing defenses---pattern filtering, dual-LLM architectures, output validation---lack a fundamental primitive: \emph{data provenance}. Without tracking where each argument originated, no defense can reliably distinguish a user-initiated operation from an attacker-injected one, particularly when attacker-chosen tools are not syntactically distinguishable from legitimate ones.
 
-We present \sys{}, a provenance-verified capability sandboxing framework that enforces security at the tool-call boundary. \sys{} maintains a directed acyclic graph grounded in the W3C PROV Data Model, labeling every input with trust annotations from a two-element lattice and propagating trust via the lattice meet operator. An enforcement proxy resolves each argument's provenance through a three-stage pipeline---substring matching, sentence-embedding similarity, and conservative default---then evaluates declarative policies combining capability restrictions, provenance constraints, and scope limitations. We evaluate \sys{} across 200 scenarios with four open-source LLM models over five repetitions (4,000 defense trials) and three baselines (12,000 additional trials). \sys{} achieves an attack success rate on integrity/availability patterns (ASR-IA) of \textbf{1.09\% $\pm$ 0.36} with \textbf{95.00\% task success rate}, representing a 24$\times$ reduction versus undefended baselines. All results include 95\% Wilson-score confidence intervals from multi-trial evaluation.
+We present \sys{}, a provenance-gated capability enforcement framework for tool-using LLM agents, demonstrated on IoT and indirect-injection benchmarks. \sys{} maintains a directed acyclic graph grounded in the W3C PROV Data Model, labeling every input with trust annotations from a two-element lattice and propagating trust via the lattice meet operator. An enforcement proxy resolves each argument's provenance through a three-stage pipeline---substring matching, sentence-embedding similarity, and conservative default---then evaluates declarative policies combining capability restrictions, provenance constraints, and scope limitations. We evaluate \sys{} across 200 scenarios (160 attacks, 40 benign) with four open-source LLMs (3B--9B parameters) over five repetitions, yielding 16,000 statistically independent trials across four defense configurations. \sys{} achieves an attack success rate on integrity/availability violations (ASR-IA) of \textbf{1.09\% $\pm$ 0.36} with \textbf{95.00\% $\pm$ 1.52 task success rate}, a 24$\times$ reduction versus undefended baselines ($p < 0.001$, Cohen's $h > 0.8$, Fisher exact with Bonferroni correction). Crucially, on the external InjecAgent benchmark (1,054 indirect prompt injection cases, 63 attacker tools), policy enforcement \emph{without} provenance achieves 22.67\% ASR---no better than no defense---while \sys{} reduces ASR to \textbf{4.12\% $\pm$ 0.5}, confirming that provenance is essential when attacker tools cannot be identified by syntax alone.
 \end{abstract}
 
 \begin{IEEEkeywords}

@@ -1,142 +1,154 @@
-# PROVSAFE
+# PROVSAFE: Provenance-Gated Policy Enforcement for Tool-Using LLM Agents
 
-**Tool-Call Policy Enforcement Proxy with Provenance Logging and Prompt Injection Benchmark**
+**PROVSAFE** is a provenance-gated capability enforcement framework that defends tool-using LLM agents against prompt injection attacks. It tracks where every tool-call argument originated and enforces declarative policies at the tool-call boundary — blocking attacker-injected operations while allowing legitimate ones.
 
-PROVSAFE is a research prototype implementing:
-- **Policy-based tool-call filtering** with capability constraints
-- **Provenance tracking** linking tool calls to source inputs
-- **Prompt injection benchmark suite** for evaluating agent safety
+## Key Results
+
+| System | ASR-IA ↓ | TSR ↑ | Benchmark |
+|--------|----------|-------|-----------|
+| No Defense | 25.94% | 99.38% | TDSC (16K trials) |
+| Pattern Filter | 7.50% | 99.38% | TDSC |
+| Policy-Only | 1.88% | 97.50% | TDSC |
+| **PROVSAFE** | **1.09%** | **95.00%** | **TDSC** |
+| Policy-Only | 22.67% | — | InjecAgent (1,054 cases) |
+| **PROVSAFE** | **4.12%** | — | **InjecAgent** |
+
+Provenance is the deciding factor: Policy-Only matches No Defense on InjecAgent (22.67% vs 20.83%) because attacker tools are not syntactically dangerous. PROVSAFE reduces ASR to 4.12% by tracing arguments to their untrusted source.
 
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Agent     │────▶│  Proxy       │────▶│ Tool API    │
-│   Request   │     │  + Policy    │     │             │
-└─────────────┘     └──────────────┘     └─────────────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │  Provenance  │
-                    │  Graph       │
-                    └──────────────┘
+User Command (TRUSTED)
+    │
+    ▼
+┌─────────────┐
+│  LLM Agent  │
+└──────┬──────┘
+       │ tool call
+       ▼
+┌──────────────────────────────────────┐
+│        Enforcement Proxy             │
+│  1. Decode args (9 encodings)        │
+│  2. Resolve provenance (DAG)         │
+│  3. Evaluate YAML policy             │
+│  4. Trust-lattice gate               │
+│  5. User confirmation (if needed)    │
+│  6. SHA-256 audit log                │
+└──────┬───────────────────────────────┘
+       │
+       ▼
+┌─────────────┐    ┌──────────────┐
+│  Tool APIs  │◄───│ External APIs │ (UNTRUSTED)
+└─────────────┘    └──────────────┘
 ```
 
 ## Installation
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
-## Usage
+Requirements: Python 3.9+, [LM Studio](https://lmstudio.ai/) for local LLM inference.
 
-### Quick Start
+## Quick Start
 
-Run a simple test:
 ```bash
+# Smoke test (no LLM needed)
 python scripts/quick_test.py
+
+# Run tests
+pytest
+
+# Quick evaluation (10 scenarios, 2 reps)
+cd evaluation/
+python run_tdsc_experiments.py --quick
 ```
 
-### Basic Evaluation
+## Full Evaluation
 
-Run benign tasks:
+### TDSC Benchmark (16,000 trials)
+
 ```bash
-python -m provsafe.eval.run_suite \
-  --suite configs/suites/default.yaml \
-  --policy configs/policies/provsafe.yaml \
-  --out runs/test \
-  --seed 123
+cd evaluation/
+python run_tdsc_experiments.py                    # Full run (~24 hours)
+python run_tdsc_experiments.py --resume           # Resume from checkpoint
+python run_tdsc_experiments.py --quick            # Quick test (10 scenarios)
+python run_tdsc_experiments.py --model qwen2.5-7b-instruct  # Single model
 ```
 
-Run attack suite:
+### InjecAgent External Benchmark
+
 ```bash
-python -m provsafe.eval.run_attacks \
-  --suite configs/suites/injection.yaml \
-  --policy configs/policies/provsafe.yaml \
-  --out runs/attacks \
-  --seed 123
+cd evaluation/
+python run_injecagent.py --reps 3 --setting base  # Full run
+python run_injecagent.py --quick                   # Quick test
 ```
 
-### Research-Grade Evaluation
+### LLM-as-Judge Verification
 
-For publication-quality results:
-
-**1. Comparative Baseline Evaluation:**
 ```bash
-python -m provsafe.eval.run_comparative \
-  --suite configs/suites/comprehensive_attacks.yaml \
-  --policy configs/policies/provsafe.yaml \
-  --out runs/comparative \
-  --seed 42
+cd evaluation/
+python llm_judge.py --results ../results/tdsc_full_v2/all_results.json --sample 200
 ```
 
-**2. Ablation Study:**
+## Supported LLM Providers
+
+| Provider | Models | Cost |
+|----------|--------|------|
+| LM Studio (local) | Llama-3.1-8B, Qwen2.5-7B, Gemma-2-9B, Phi-3.5-Mini | Free |
+| Groq (cloud) | Llama-3.1-70B | Free tier |
+| Google Gemini (cloud) | Gemini-1.5-Flash | Free tier |
+
 ```bash
-python -m provsafe.eval.run_ablation \
-  --suite configs/suites/default.yaml \
-  --policy configs/policies/provsafe.yaml \
-  --out runs/ablation \
-  --seed 42
+# Set API keys for cloud providers (optional)
+export GROQ_API_KEY=gsk_...
+export GEMINI_API_KEY=AIza...
 ```
-
-**3. Statistical Analysis (Multiple Trials):**
-```bash
-python -m provsafe.eval.run_statistical \
-  --suite configs/suites/injection.yaml \
-  --policy configs/policies/provsafe.yaml \
-  --out runs/statistical \
-  --trials 30 \
-  --start-seed 42
-```
-
-**4. Full Evaluation Pipeline:**
-```bash
-bash scripts/run_full_evaluation.sh
-```
-
-See [RESEARCH_EVALUATION.md](RESEARCH_EVALUATION.md) for detailed methodology and interpretation.
-
-## Metrics
-
-### Primary Metrics
-
-- **TSR (Task Success Rate)**: Fraction of benign tasks that completed successfully (measures usability)
-- **ASR (Attack Success Rate)**: Fraction of attacks that successfully executed high-risk actions (measures security)
-- **UAR (Unwanted Action Rate)**: Fraction of benign tasks incorrectly blocked (measures false positives)
-
-### Secondary Metrics
-
-- **Confirmations/Task**: Average number of user confirmations required
-- **Latency**: Average decision latency per tool call
-
-### Target Performance
-
-| Metric | Target | Interpretation |
-|--------|--------|----------------|
-| TSR | > 90% | High usability |
-| ASR | < 10% | Strong security |
-| UAR | < 10% | Low false positives |
-| Conf/Task | < 0.5 | Minimal user burden |
-| Latency | < 100ms | Acceptable overhead |
 
 ## Project Structure
 
 ```
 provsafe/
-├── src/provsafe/
-│   ├── proxy/          # Tool-call validation and enforcement
-│   ├── policy/         # YAML policy parser and evaluator
-│   ├── provenance/     # Provenance graph and tracking
-│   ├── bench/          # Benchmark task definitions
-│   ├── attacks/        # Attack patterns and injection strings
-│   ├── eval/           # Evaluation runner and metrics
-│   └── replay/         # Deterministic replay
-├── configs/
-│   ├── policies/       # Policy YAML files
-│   ├── suites/         # Test suite definitions
-│   └── tools/          # Tool schemas
-├── scripts/            # Utility scripts
-└── tests/              # pytest test suite
+├── src/                          # Core framework
+│   ├── enforcement_proxy.py      # 7-stage enforcement pipeline
+│   ├── provenance_graph.py       # W3C PROV-DM DAG with trust lattice
+│   ├── policy_engine.py          # YAML policy evaluator
+│   └── provsafe/                 # Python package
+├── evaluation/                   # Research evaluation
+│   ├── run_tdsc_experiments.py   # Main 16K-trial experiment
+│   ├── run_injecagent.py         # InjecAgent benchmark
+│   ├── baseline_systems.py       # 4 defense systems
+│   ├── model_providers.py        # Multi-provider LLM config
+│   └── llm_judge.py              # LLM-as-Judge verification
+├── configs/policies/             # YAML policy files
+├── overleaf/                     # IEEE TDSC paper (LaTeX)
+├── results/                      # Experiment results
+├── scripts/                      # Utility scripts
+└── tests/                        # Test suite
+```
+
+## Paper
+
+The paper targets **IEEE Transactions on Dependable and Secure Computing (TDSC)**. Source is in `overleaf/`.
+
+```bash
+# Auto-update paper numbers from results
+python scripts/update_paper_numbers.py
+python scripts/update_injecagent_numbers.py
+```
+
+## Citation
+
+```bibtex
+@article{provsafe2026,
+  title={PROVSAFE: Provenance-Gated Policy Enforcement for Tool-Using LLM Agents},
+  author={Anonymous},
+  journal={IEEE Transactions on Dependable and Secure Computing},
+  year={2026},
+  note={Under review}
+}
 ```
 
 ## License

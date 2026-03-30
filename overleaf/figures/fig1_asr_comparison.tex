@@ -25,34 +25,29 @@
 
   \def\barwidth{1.2}
 
-  % Pre-LLM screened: 6.9% -> 1.38
-  \fill[info] (1-\barwidth/2, 0) rectangle (1+\barwidth/2, 1.38);
-  \node[below, font=\footnotesize, align=center] at (1, -0.35) {Pre-LLM\\Screened};
-  \node[above, font=\footnotesize\bfseries, info!80!black] at (1, 1.38) {6.9\%};
+  % Boundary blocked (pre-LLM + provenance/policy proxy): 25.3% -> 5.06
+  \fill[success] (2-\barwidth/2, 0) rectangle (2+\barwidth/2, 5.06);
+  \node[below, font=\footnotesize, align=center] at (2, -0.35) {Boundary\\Blocked};
+  \node[above, font=\footnotesize\bfseries, success!80!black] at (2, 5.06) {25.3\%};
 
-  % Proxy blocked (provenance/policy): 30.2% -> 6.04
-  \fill[success] (3-\barwidth/2, 0) rectangle (3+\barwidth/2, 6.04);
-  \node[below, font=\footnotesize, align=center] at (3, -0.35) {Proxy\\Blocked};
-  \node[above, font=\footnotesize\bfseries, success!80!black] at (3, 6.04) {30.2\%};
+  % Model refused (TC=0): 28.4% -> 5.68
+  \fill[secondary] (4.5-\barwidth/2, 0) rectangle (4.5+\barwidth/2, 5.68);
+  \node[below, font=\footnotesize, align=center] at (4.5, -0.35) {Model\\Refused};
+  \node[above, font=\footnotesize\bfseries, secondary] at (4.5, 5.68) {28.4\%};
 
-  % Model refused: 16.6% -> 3.32
-  \fill[secondary] (5-\barwidth/2, 0) rectangle (5+\barwidth/2, 3.32);
-  \node[below, font=\footnotesize, align=center] at (5, -0.35) {Model\\Refused};
-  \node[above, font=\footnotesize\bfseries, secondary] at (5, 3.32) {16.6\%};
-
-  % Safe tool calls: 45.3% -> 9.06
-  \fill[warning] (7-\barwidth/2, 0) rectangle (7+\barwidth/2, 9.06);
+  % Safe tool calls: 45.2% -> 9.04
+  \fill[warning] (7-\barwidth/2, 0) rectangle (7+\barwidth/2, 9.04);
   \node[below, font=\footnotesize, align=center] at (7, -0.35) {Safe\\Allowed};
-  \node[above, font=\footnotesize\bfseries, warning!80!black] at (7, 9.06) {45.3\%};
+  \node[above, font=\footnotesize\bfseries, warning!80!black] at (7, 9.04) {45.2\%};
 
   % ASR bypasses: 1.1% -> 0.22
-  \fill[danger] (9-\barwidth/2, 0) rectangle (9+\barwidth/2, 0.22);
-  \node[below, font=\footnotesize, align=center] at (9, -0.35) {ASR-IA\\Bypassed};
-  \node[above, font=\footnotesize\bfseries, danger] at (9, 0.22) {1.1\%};
+  \fill[danger] (9.5-\barwidth/2, 0) rectangle (9.5+\barwidth/2, 0.22);
+  \node[below, font=\footnotesize, align=center] at (9.5, -0.35) {ASR-IA\\Bypassed};
+  \node[above, font=\footnotesize\bfseries, danger] at (9.5, 0.22) {1.1\%};
 
   % Callout
   \node[draw, rounded corners, fill=success!10, font=\footnotesize, align=center]
-    at (7.9, 6.5) {Boundary-level blocking\\= 37.0\% (6.9 + 30.2)};
+    at (7.5, 7) {Boundary-level enforcement\\blocks 25.3\% of attack trials};
 
 \end{tikzpicture}
 \end{document}

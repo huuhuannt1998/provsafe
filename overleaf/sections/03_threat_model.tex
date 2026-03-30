@@ -18,15 +18,10 @@ We model a \emph{remote indirect adversary} with the following capabilities and 
 \end{enumerate}
 
 \paragraph{Limitations.}
-\begin{enumerate}[leftmargin=1.5em]
-  \item The attacker \emph{cannot} modify system prompts, directly inject into user commands, or compromise the \sys{} enforcement proxy itself (these are trusted components).
-  \item The attacker \emph{cannot} exploit gradient-based adversarial attacks on model weights (we focus on prompt-level attacks accessible to practical adversaries).
-  \item The attacker has \emph{no} physical access to the home network or devices (remote-only threat).
-  \item The attacker \emph{cannot} observe the agent's internal reasoning or tool call decisions in real-time (no oracle access to the defense system's state).
-\end{enumerate}
+The attacker cannot modify system prompts, compromise the \sys{} enforcement proxy, or exploit gradient-based adversarial attacks on model weights---we focus on prompt-level attacks accessible to practical remote adversaries. The attacker also has no physical access to the home network and no real-time oracle access to the defense system's internal state.
 
 \paragraph{Scope: Physical-Layer Threats.}
-Physical-layer attacks---voice injection via ultrasound or speakers~\cite{carlini2016hidden}, sensor spoofing, and electromagnetic side channels---are orthogonal to the prompt injection threat we address. These attacks target the \emph{input transducer} (microphone, sensor) rather than the \emph{LLM context window}. Defending against them requires signal-level authentication (e.g., speaker verification, sensor attestation), which is complementary to \sys{}'s provenance tracking at the tool-call boundary. We consider physical-layer defense an important but separate research direction.
+Physical-layer attacks---voice injection~\cite{carlini2016hidden}, sensor spoofing, electromagnetic side channels---target input transducers rather than the LLM context window and require signal-level authentication orthogonal to \sys{}'s tool-call-boundary provenance tracking. We consider them an important but separate research direction.
 
 \subsection{Attack Taxonomy}
 

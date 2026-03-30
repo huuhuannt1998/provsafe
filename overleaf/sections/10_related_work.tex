@@ -2,33 +2,31 @@
 \label{sec:related}
 
 \paragraph{Prompt Injection Attacks.}
-Perez et al.~\cite{perez2022ignore} first showed LLMs cannot reliably separate instructions from data. Greshake et al.~\cite{greshake2023not} introduced \emph{indirect} prompt injection via external content. Benchmark suites including InjecAgent~\cite{injecagent2024} (1{,}054 cases, 17 tools) and AgentDojo~\cite{agentdojo2024} provide standardized evaluation frameworks. We evaluate all 8 attack categories across 4 open-source models over 5 repetitions (4{,}000 \sys{} trials), complementing these benchmarks with a provenance-focused evaluation design.
+Perez et al.~\cite{perez2022ignore} first showed LLMs cannot reliably separate instructions from data; Greshake et al.~\cite{greshake2023not} extended this to \emph{indirect} injection via external content. Benchmarks including InjecAgent~\cite{injecagent2024}, AgentDojo~\cite{agentdojo2024}, and CyberSecEval~\cite{cyberseceval2024} provide standardized evaluation, and OWASP~\cite{owasp-llm2025} now ranks prompt injection as the top LLM risk.
 
 \paragraph{Input Filtering and Guardrails.}
-Pattern filters (Rebuff~\cite{rebuff-defense}, LLM Guard~\cite{llm-guard}) achieve moderate detection rates but are fundamentally limited: without provenance, they cannot distinguish trusted from untrusted arguments. Learned detectors (PromptGuard~\cite{prompt-guard}) suffer distribution shift. Production guardrails (NeMo Guardrails~\cite{nemo-guardrails}) provide modular scanners at the prompt level. Unlike detection-based approaches, \sys{} enforces policies at the tool-call boundary with provenance awareness.
+Pattern filters (Rebuff~\cite{rebuff-defense}, LLM Guard~\cite{llm-guard}) and learned detectors (PromptGuard~\cite{prompt-guard}) achieve moderate detection rates but cannot distinguish trusted from untrusted arguments without provenance. Production guardrails (NeMo Guardrails~\cite{nemo-guardrails}) operate at the prompt level rather than the tool-call boundary.
 
 \paragraph{Dual-LLM and Instruction Hierarchy.}
-Robust Prompt~\cite{robust-prompt} uses a filter LLM (2$\times$ cost, new attack surface). Self-Reminder~\cite{self-reminder} and Dual-Process~\cite{dual-llm-defense} add overhead or require retraining. Instruction hierarchies~\cite{openai-system-prompt} and delimiters~\cite{delimiters-defense} fail against indirect injection where attacker content appears as trusted context. \sys{} tracks provenance \emph{externally}---unauthorized tool calls are blocked even if the LLM ignores all safety instructions.
+Dual-LLM approaches (Robust Prompt~\cite{robust-prompt}, Self-Reminder~\cite{self-reminder}, Dual-Process~\cite{dual-llm-defense}) add cost or require retraining. StruQ~\cite{struq2024} and SecAlign~\cite{secalign2024} require training-time intervention; instruction hierarchy~\cite{instruction-hierarchy2024} requires fine-tuning. All are model-internal and cannot protect already-deployed models; \sys{} enforces provenance externally without model modification.
 
 \paragraph{Output Validation and Sandboxing.}
-LangChain Guardrails~\cite{langchain-guardrails} validate tool calls against rules but make context-free decisions. Least-privilege sandboxing is too coarse for agents needing conditional write access. \sys{}'s provenance-aware policies enable fine-grained control: the same tool call may be allowed or denied depending on argument origin.
+LangChain Guardrails~\cite{langchain-guardrails} validate tool calls but make context-free decisions; least-privilege sandboxing is too coarse for agents needing conditional access. \sys{}'s provenance-aware policies allow or deny the same tool call depending on argument origin.
 
 \paragraph{LLM Agent Security.}
-Tool-augmented LLMs~\cite{schick2023toolformer,talm} and autonomous agents (AutoGPT~\cite{autogpt}) amplify injection risks but lack structured security enforcement. InjecAgent~\cite{injecagent2024} reports 24\% vulnerability for GPT-4 on indirect injections. \sys{} provides the enforcement layer that prompt-level defenses cannot.
+Tool-augmented LLMs~\cite{schick2023toolformer,talm} and autonomous agents (AutoGPT~\cite{autogpt}) amplify injection risks; InjecAgent~\cite{injecagent2024} reports 24\% vulnerability for GPT-4. ToolEmu~\cite{toolemu2024} emulates tool execution for safety evaluation but provides no runtime enforcement.
 
 \paragraph{Data Provenance and Taint Tracking.}
-The provenance literature provides foundational models: why-provenance~\cite{buneman2001provenance}, where-provenance, and how-provenance~\cite{green2007provenance} (formalized as semiring annotations). The W3C PROV-DM standard~\cite{prov-dm} unifies these into an entity--activity--agent model. In security, dynamic taint analysis~\cite{taint-analysis-survey,taintdroid} propagates binary labels through instructions, and DIFC systems~\cite{difc-survey,flume} enforce information-flow policies with lattice-based labels.
-
-\sys{} adapts why-provenance to the LLM agent setting. Trust labels form a two-element lattice propagated via meet, analogous to DIFC but tracked externally at the tool-call boundary. Three differences distinguish the LLM setting: (1)~opaque computation requiring boundary-level provenance; (2)~approximate resolution via embeddings for paraphrased content; (3)~nuanced trust policies (agents must read untrusted data to function).
+Why-provenance~\cite{buneman2001provenance}, the W3C PROV-DM standard~\cite{prov-dm}, dynamic taint analysis~\cite{taint-analysis-survey,taintdroid}, and DIFC systems~\cite{difc-survey,flume} provide foundational models. \sys{} adapts why-provenance to LLM agents with three key differences: opaque computation requiring boundary-level tracking, approximate resolution via embeddings for paraphrased content, and nuanced trust policies since agents must read untrusted data to function.
 
 \paragraph{Capability-Based and IoT Security.}
-\sys{} adapts capability-based security~\cite{miller2006capability,capsicum} to LLM tool calls and extends IoT access control (ContextIoT~\cite{jia2017contexiot}, IoTGuard~\cite{iotguard}) with provenance-aware policies.
+\sys{} adapts capability-based security~\cite{miller2006capability,capsicum} to LLM tool calls and extends context-aware IoT access control (ContextIoT~\cite{jia2017contexiot}, IoTGuard~\cite{iotguard}) with provenance tracking.
 
 \paragraph{Tool-Call-Level Enforcement.}
-The closest comparison is defenses at the same architectural layer. LangChain's \texttt{ToolInputSchema}~\cite{langchain-guardrails} checks argument types without provenance. Invariant~\cite{invariant2024} detects prompt injection at the tool-call level using behavioral invariants but does not track provenance and reports detection-only results. \sys{} provides the complete pipeline: provenance tracking, policy evaluation, user confirmation, and audit logging.
+Invariant~\cite{invariant2024} detects prompt injection at the tool-call level via behavioral invariants but provides detection-only results without provenance. \sys{} provides the complete enforcement pipeline: provenance tracking, policy evaluation, confirmation gating, and audit logging.
 
 \paragraph{Qualitative Comparison.}
-Table~\ref{tab:feature-comparison} compares \sys{} with representative defenses on architectural features. Because prior systems evaluate on different benchmarks, model sizes, and attack distributions, we report features rather than numerical comparisons to avoid misleading cross-benchmark comparison.
+Table~\ref{tab:feature-comparison} compares \sys{} with representative defenses on architectural features; we report features rather than numbers to avoid misleading cross-benchmark comparison.
 
 \begin{table}[t]
 \centering
@@ -45,6 +43,8 @@ PromptGuard~\cite{prompt-guard}       & \xmark & \xmark & \xmark & \xmark & $\si
 Spotlighting~\cite{spotlighting2024}  & \xmark & $\sim$ & \xmark & \xmark & \xmark \\
 NeMo~\cite{nemo-guardrails}           & \xmark & \xmark & \cmark & \xmark & \xmark \\
 Invariant~\cite{invariant2024}        & \xmark & \cmark & \xmark & \cmark & \xmark \\
+StruQ~\cite{struq2024}                & \xmark & \cmark & \xmark & \xmark & \xmark \\
+ToolEmu~\cite{toolemu2024}            & \xmark & $\sim$ & \xmark & \cmark & \xmark \\
 \midrule
 \textbf{\sys{} (Ours)}               & \cmark & \cmark & \cmark & \cmark & \cmark \\
 \bottomrule

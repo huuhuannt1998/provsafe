@@ -14,9 +14,9 @@ The enforcement proxy intercepts every tool call between the LLM agent and tool 
 
 The proxy executes a seven-stage pipeline for every proposed tool call (Fig.~\ref{fig:proxy}):
 \textbf{(1)~Interception} of the tool invocation;
-\textbf{(2)~Argument validation} for encoded payloads, path traversal, and injection patterns;
-\textbf{(3)~Provenance resolution} via the three-stage pipeline (Section~\ref{sec:policies});
-\textbf{(4)~Policy evaluation} in priority order (Algorithm~\ref{alg:policy}), including hardcoded dangerous-action blocks;
+\textbf{(2)~Argument pre-processing}---a canonicalization pass decodes arguments through nine encoding schemes (Unicode NFKD, hex escapes, octal, Base64, pure hex, ROT13, URL percent-encoding with double-decode, binary strings, HTML entities) and flags suspicious structural patterns (path traversal, shell metacharacters). \emph{Critically, this stage marks flagged arguments as UNTRUSTED rather than short-circuiting the pipeline.} This ensures the provenance and policy stages are always consulted, enabling ablation studies and preventing the canonicalization pass from becoming a single point of failure;
+\textbf{(3)~Provenance resolution} via the three-stage pipeline (Section~\ref{sec:policies}), incorporating any untrusted labels injected by Stage~2;
+\textbf{(4)~Policy evaluation} in priority order (Algorithm~\ref{alg:policy}), with provenance information from Stages~2--3 combined into a single \texttt{has\_untrusted\_args} signal;
 \textbf{(5)~User confirmation} if the matched rule returns REQUIRE\_CONFIRMATION;
 \textbf{(6)~Decision logging} in an append-only, SHA-256--chained audit ledger;
 \textbf{(7)~Execution or denial}---approved calls proceed; denied calls return errors to the agent.

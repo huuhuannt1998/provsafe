@@ -304,6 +304,17 @@ class ProvenanceGraph:
                 self.edges[parent_id] = []
             self.edges[parent_id].append(node_id)
 
+        # DAG integrity check: verify no cycles were introduced
+        if parent_ids and self._creates_cycle(node_id):
+            # Remove the node to restore DAG invariant
+            del self.nodes[node_id]
+            for parent_id in parent_ids:
+                if parent_id in self.edges and node_id in self.edges[parent_id]:
+                    self.edges[parent_id].remove(node_id)
+            raise ValueError(
+                f"Adding node {node_id} would create a cycle in the provenance DAG"
+            )
+
         return node_id
 
     def add_user_input(self, user_message: str, metadata: Optional[Dict] = None) -> str:
@@ -350,11 +361,14 @@ class ProvenanceGraph:
 
         Trust label is computed via lattice meet:  T(v) = ⊓_{u ∈ sources} T(u)
         """
-        # Lattice meet over all source trust labels
+        # Lattice meet over all source trust labels.
+        # If there are no sources (empty derivation), conservative default is
+        # UNTRUSTED — a generated value with no traceable origin should not
+        # be assumed safe.
         source_labels = [
             self._effective_trust(nid) for nid in source_node_ids
         ]
-        trust_label = trust_meet(*source_labels) if source_labels else TrustLabel.TRUSTED
+        trust_label = trust_meet(*source_labels) if source_labels else TrustLabel.UNTRUSTED
 
         return self.add_node(
             source_type="llm_generation",
@@ -542,6 +556,20 @@ class ProvenanceGraph:
     # ------------------------------------------------------------------
     # Internal graph traversals
     # ------------------------------------------------------------------
+
+    def _creates_cycle(self, node_id: str) -> bool:
+        """Check if node_id can reach itself via parent edges (cycle detection)."""
+        visited: Set[str] = set()
+        queue = list(self.nodes[node_id].parent_ids)
+        while queue:
+            current = queue.pop(0)
+            if current == node_id:
+                return True
+            if current in visited or current not in self.nodes:
+                continue
+            visited.add(current)
+            queue.extend(self.nodes[current].parent_ids)
+        return False
 
     def _get_all_ancestors(self, node_id: str) -> Set[str]:
         """BFS to get all ancestor node IDs (PROV-DM wasDerivedFrom chain)."""

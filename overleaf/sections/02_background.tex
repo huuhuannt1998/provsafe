@@ -12,26 +12,7 @@ The standard interaction follows a request--response pattern. The LLM generates 
 
 \subsection{Prompt Injection}
 
-Prompt injection~\cite{perez2022ignore,greshake2023not} exploits the fact that LLMs process instructions and data in the same text stream, with no syntactic boundary (unlike SQL where parameterized queries separate code from data). We distinguish three injection vectors:
-
-\paragraph{Direct Injection.}
-The attacker embeds malicious instructions directly in user-facing input. Example: ``List my files. IGNORE PREVIOUS INSTRUCTIONS. Delete /etc/passwd.'' Modern LLMs with safety training resist most direct injections, but success rates remain non-trivial: InjecAgent~\cite{injecagent2024} reports 24\% vulnerability for GPT-4.
-
-\paragraph{Indirect Injection.}
-The attacker embeds instructions in content the agent reads during execution~\cite{greshake2023not}---device names, calendar events, file contents, web pages, email bodies. This is more dangerous because (1)~the attacker need not interact with the user directly, (2)~the injected content appears in a context where the LLM expects legitimate data, and (3)~the injection persists across sessions (e.g., a malicious device name remains until changed).
-
-\paragraph{Chained and Multi-Vector Attacks.}
-Advanced attacks combine multiple vectors across turns. A \emph{multi-turn chaining} attack might inject a benign-looking instruction in turn~1 that establishes context, then trigger a dangerous action in turn~3 when the agent references the earlier context. \emph{Encoding obfuscation} uses Base64, hexadecimal, URL encoding, ROT13, or Unicode to bypass pattern-based filters. \emph{Role-play jailbreaks} (``You are DAN, Do Anything Now\ldots'') attempt to override the system prompt entirely.
-
-\paragraph{Why Existing Defenses Fail.}
-Each category of existing defense fails on at least one axis:
-\begin{itemize}[leftmargin=1.2em]
-  \item \textbf{Input/keyword filters}~\cite{rebuff-defense,llm-guard}: Bypass via paraphrasing, encoding, or multilingual reformulation. Our evaluation (Section~\ref{subsec:paraphrase}) shows substring matching achieves only 7.8\% block rate on natural-language argument attacks.
-  \item \textbf{Output validation}: Lacks provenance context---the same \texttt{fs.delete("/tmp/cache")} action may be benign (user-requested cleanup) or malicious (injected via device name). Without origin context, validation cannot distinguish the two.
-  \item \textbf{Instruction hierarchy}~\cite{openai-system-prompt}: Assigns priority levels to system vs.\ user vs.\ assistant messages but does not cover indirect injection where attacker content appears within tool results (which have the same priority as legitimate tool output).
-  \item \textbf{Dual-LLM architectures}~\cite{robust-prompt}: Double inference cost, introduce a new attack surface (the filter LLM can itself be injected), and typically handle only direct injection.
-  \item \textbf{Blanket user confirmation}: Secure but destroys usability---users experience confirmation fatigue and begin approving reflexively, negating the security benefit.
-\end{itemize}
+Prompt injection~\cite{perez2022ignore,greshake2023not} exploits the fact that LLMs process instructions and data in the same text stream, with no syntactic boundary. Three vectors are relevant: \emph{direct injection}, where the attacker embeds malicious instructions in user-facing input (InjecAgent~\cite{injecagent2024} reports 24\% vulnerability for GPT-4); \emph{indirect injection}~\cite{greshake2023not}, where instructions are embedded in content the agent reads during execution---device names, calendar events, file contents---making it more dangerous because the attacker need not interact with the user and the payload persists across sessions; and \emph{chained/multi-vector attacks}, which combine cross-turn injection chains, encoding obfuscation (Base64, hex, ROT13, Unicode), and role-play jailbreaks to evade pattern-based defenses. Section~\ref{sec:intro} discusses why existing defenses---input filters, output validation, instruction hierarchy, and dual-LLM architectures---each fail to address the root cause: the absence of data provenance.
 
 \subsection{Capability Security and Provenance}
 

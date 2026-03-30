@@ -1,0 +1,28 @@
+{
+  "aggregate": {
+    "no_defense": {
+      "asr_ia_mean": 20.83,
+      "asr_ia_ci_half": 0.9,
+      "n_trials": 7273,
+      "n_succeeded": 1515
+    },
+    "pattern_filter": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.0,
+      "n_trials": 4577,
+      "n_succeeded": 0
+    },
+    "policy_only": {
+      "asr_ia_mean": 22.67,
+      "asr_ia_ci_half": 1.0,
+      "n_trials": 6321,
+      "n_succeeded": 1433
+    },
+    "provsafe": {
+      "asr_ia_mean": 4.12,
+      "asr_ia_ci_half": 0.5,
+      "n_trials": 5734,
+      "n_succeeded": 236
+    }
+  }
+}

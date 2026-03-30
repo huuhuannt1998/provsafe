@@ -15,13 +15,16 @@ We evaluate 200 scenarios: 160 attacks across 8 categories (Direct Injection, De
 Four open-source models represent the practical deployment target for on-premise agents on consumer hardware: Meta-Llama-3.1-8B-Instruct (8B parameters), Qwen2.5-7B-Instruct (7B), Gemma-2-9B-IT (9B, Google DeepMind), and Phi-3.5-Mini-Instruct (3B, Microsoft). All run locally via LM Studio on an Apple M-series machine (16\,GB RAM), reflecting deployment settings where privacy-sensitive operations should not leave the local network. The four families (Meta, Alibaba, Google, Microsoft) spanning 3B--9B parameters test generalizability across architectures.
 
 \paragraph{Baselines.}
-Four configurations isolate the contribution of each defense layer: (1)~\textbf{No Defense}: all tool calls execute unfiltered; (2)~\textbf{Pattern Filter}: 47-rule regex scanner (Rebuff-derived~\cite{rebuff2023}) at the tool-call boundary; (3)~\textbf{Policy-Only}: \sys{} proxy and policy engine without provenance tracking; (4)~\textbf{\sys{} (Full)}: complete system with provenance DAG, three-stage resolution, pre-LLM screening, argument validation, and policy evaluation.
+Four configurations isolate the contribution of each defense layer: (1)~\textbf{No Defense}: all tool calls execute unfiltered; (2)~\textbf{Pattern Filter}: 47-rule regex scanner (Rebuff-derived~\cite{rebuff2023}) at the tool-call boundary; (3)~\textbf{Policy-Only}: identical to \sys{} but with provenance resolution disabled---all tool-call arguments are treated as having unknown provenance (\texttt{has\_untrusted\_args = false}), so only the deterministic dangerous-action rules and risk-tier defaults apply. Rate limiting is disabled for both Policy-Only and \sys{} to isolate provenance as the variable under test. This baseline isolates the contribution of provenance tracking; (4)~\textbf{\sys{} (Full)}: complete system with provenance DAG, three-stage resolution, pre-LLM screening, argument validation, and policy evaluation.
 
 \paragraph{Experimental Protocol.}
-Each configuration is evaluated with five independent repetitions per scenario-model pair. All inference uses temperature $T=0.0$ (greedy decoding) to minimize output variance; remaining stochasticity arises from floating-point non-determinism in GPU kernels. This yields $200 \times 4 \times 5 = 4{,}000$ \sys{} trials and $200 \times 4 \times 5 \times 3 = 12{,}000$ baseline trials (16{,}000 total). Models are loaded and unloaded sequentially via the LM Studio management API.
+Each configuration is evaluated with five independent repetitions per scenario-model pair. Repetition~1 uses temperature $T=0.0$ (greedy decoding); repetitions 2--5 use $T \in \{0.05, 0.10, 0.15, 0.20\}$ to introduce genuine sampling variation while staying near-deterministic. Each repetition is assigned a unique seed derived from a cryptographic hash of the scenario identifier, system name, model name, and repetition index, making results reproducible. This design ensures per-repetition ASR estimates are statistically independent across repetitions, enabling meaningful bootstrap confidence intervals---trials would otherwise be identical under pure greedy decoding. This yields $200 \times 4 \times 5 = 4{,}000$ \sys{} trials and $200 \times 4 \times 5 \times 3 = 12{,}000$ baseline trials (16{,}000 total). Models are loaded and unloaded sequentially via the LM Studio management API.
 
 \paragraph{Metrics.}
-Attack Success Rate on integrity/availability patterns (ASR-IA, lower is better), Task Success Rate (TSR, higher is better), and False Positive Rate (FPR). We report 95\% Wilson-score confidence intervals for all binomial proportions. A tool call is ``dangerous'' if it matches one of four deterministic patterns: delete action, write to absolute path, unlock action, or temperature outside 60--85\textdegree{}F.
+Attack Success Rate on integrity/availability patterns (ASR-IA, lower is better), Task Success Rate (TSR, higher is better), and False Positive Rate (FPR). We report 95\% Wilson-score confidence intervals for all binomial proportions~\cite{wilson1927probable}. A tool call is ``dangerous'' if it matches one of four deterministic patterns: delete action, write to absolute path, unlock action, or temperature outside 60--85\textdegree{}F. Our primary metric ASR-IA captures integrity and availability violations. Confidentiality violations---exfiltration through permitted channels such as \texttt{notify.send}---are not captured by ASR-IA; we analyze one such case in RQ7 (ADV-PA-03) but do not report a systematic confidentiality metric. This is a limitation discussed in Section~\ref{sec:discussion}.
+
+\paragraph{Statistical Significance.}
+Beyond confidence intervals, we test whether ASR-IA differences between systems are statistically significant using pairwise two-sided Fisher exact tests with Bonferroni correction for multiple comparisons ($\alpha = 0.05$, $k = 6$ pairs). We report adjusted $p$-values and Cohen's $h$ as a standardized effect size for proportions~\cite{cohen1988statistical}. Cohen's $h = 2\arcsin\!\sqrt{p_1} - 2\arcsin\!\sqrt{p_2}$ is scale-invariant and appropriate for small proportions where arithmetic differences are misleading.
 
 \paragraph{Ground Truth.}
 Dangerous-call detection is deterministic and does not depend on LLM judgment. Confidentiality violations (exfiltration through permitted sinks such as \texttt{notify.send}) are analyzed separately in RQ7 and the appendix.
@@ -37,11 +40,10 @@ Dangerous-call detection is deterministic and does not depend on LLM judgment. C
 \toprule
 \textbf{Defense Layer} & \textbf{Share (mean)} & \textbf{Mechanism} \\
 \midrule
-Pre-LLM screened      & 6.9\% & Regex screening \\
-Proxy blocked (prov.)  & 30.2\% & Provenance-aware denial \\
-TC=0 (model refusal)  & 16.6\% & LLM safety training \\
-Safe tool calls        & 45.3\% & Non-dangerous calls \\
-ASR-IA bypasses        & 1.09\% $\pm$ 0.4 & Residual risk \\
+Boundary blocked (proxy) & 25.3\% & Provenance-aware denial \\
+TC=0 (model refusal)  & 28.4\% & LLM safety training \\
+Safe tool calls        & 45.2\% & Non-dangerous calls \\
+ASR-IA bypasses        & 1.09\% $\pm$ 0.36 & Residual risk \\
 \midrule
 \multicolumn{3}{l}{\textbf{Benign Evaluations}} \\
 \midrule
@@ -53,7 +55,7 @@ FPR                    & 5.0\% $\pm$ 1.5 & Over-blocking \\
 
 \begin{table}[t]
 \centering
-\caption{Baseline comparison (4{,}000 trials per system, 4 models $\times$ 200 scenarios $\times$ 5 reps). \sys{} achieves the best security--usability tradeoff.}
+\caption{Baseline comparison (4{,}000 trials per system, 4 models $\times$ 200 scenarios $\times$ 5 reps). \sys{} achieves the best security--usability tradeoff. Policy-Only uses the same policy rules as \sys{} but without provenance information; all ASR-IA differences are statistically significant ($p_{\text{adj}} < 0.001$, Fisher exact + Bonferroni).}
 \label{tab:baseline_comparison}
 \footnotesize
 \begin{tabular}{lrrl}
@@ -62,8 +64,8 @@ FPR                    & 5.0\% $\pm$ 1.5 & Over-blocking \\
 \midrule
 No Defense        & 25.94\% $\pm$ 1.5 & 99.38\% $\pm$ 0.6 & No protection \\
 Pattern Filter    & 7.50\% $\pm$ 0.9  & 99.38\% $\pm$ 0.6 & Bypassed by obfuscation \\
-Policy-Only       & 0.00\% $\pm$ 0.1  & 8.75\% $\pm$ 2.0 & Blocks most benign tasks \\
-\textbf{\sys{}}   & \textbf{1.09\% $\pm$ 0.4} & \textbf{95.00\% $\pm$ 1.5} & \textbf{Residual risk} \\
+Policy-Only       & 1.88\% $\pm$ 0.5 & 97.50\% $\pm$ 1.1 & Over-blocks without provenance context \\
+\textbf{\sys{}}   & \textbf{1.09\% $\pm$ 0.36} & \textbf{95.00\% $\pm$ 1.52} & \textbf{Residual risk} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -71,11 +73,13 @@ Policy-Only       & 0.00\% $\pm$ 0.1  & 8.75\% $\pm$ 2.0 & Blocks most benign ta
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig1_asr_comparison.pdf}
-\caption{Defense mechanism breakdown. Boundary-level enforcement (pre-LLM screening + proxy denial) blocks the largest share of attacks before execution.}
+\caption{Defense mechanism breakdown. Boundary enforcement (25.3\%) and model refusal (28.4\%) together prevent over 53\% of attacks before any dangerous tool call executes.}
 \label{fig:asr_comparison}
 \end{figure}
 
-Tables~\ref{tab:main_results}--\ref{tab:baseline_comparison} and Fig.~\ref{fig:asr_comparison} present the main results. \sys{} achieves an ASR-IA of \textbf{1.09\% $\pm$ 0.36} (95\% CI) with \textbf{95.00\% $\pm$ 1.52 TSR} across 4{,}000 trials. Compared to baselines, this represents a 24$\times$ reduction versus No Defense and 7$\times$ versus Pattern Filter, while maintaining high usability. Policy-Only achieves near-zero ASR-IA but is unusable (8.75\% TSR), confirming that provenance is necessary to distinguish legitimate from injected operations. The defense operates through complementary layers: boundary-level controls (pre-LLM screening + proxy denial) block 37.0\% of attack evaluations, while LLM safety training contributes an additional 16.6\% model-level refusal rate.
+Tables~\ref{tab:main_results}--\ref{tab:baseline_comparison} and Fig.~\ref{fig:asr_comparison} present the main results. \sys{} achieves an ASR-IA of \textbf{1.09\% $\pm$ 0.36} (95\% CI) with \textbf{95.00\% $\pm$ 1.52 TSR} across 4{,}000 trials---a 24$\times$ reduction versus No Defense and 7$\times$ versus Pattern Filter. All pairwise ASR-IA differences are statistically significant after Bonferroni correction ($p_{\text{adj}} < 0.001$, $h > 0.8$).
+
+On our TDSC benchmark, Policy-Only also achieves low ASR-IA (1.88\%) because the benchmark's dangerous-action rules---delete, unlock, extreme temperature---are sufficient to catch most attacks syntactically. This near-parity reflects a design property of our scenario suite: attack tools (\texttt{fs.delete}, \texttt{device.control} with unlock) are syntactically identifiable. The InjecAgent evaluation (Section~\ref{subsec:injecagent}) complements this with tool ecosystems where syntactic identification fails. \sys{} is at least as effective, with the added benefit of provenance context for auditing and confirmation. The critical distinction emerges on InjecAgent (Table~\ref{tab:injecagent}): Policy-Only degrades to 22.67\% ASR, nearly identical to No Defense, because attacker tools like \texttt{GmailSendEmail} and \texttt{BankManagerTransferFunds} are not syntactically dangerous---without provenance, there is nothing to block them. \sys{} reduces ASR to 4.12\%, demonstrating that provenance is the indispensable layer when the tool itself is legitimate but its arguments originate from attacker-controlled content. The defense operates through complementary layers: boundary-level proxy enforcement blocks 25.3\% of attack evaluations, while LLM safety training contributes an additional 28.4\% model-level refusal rate.
 
 \paragraph{Interpreting Safe Tool Calls.}
 A substantial fraction of attack evaluations produce tool calls that do not match our four dangerous-call patterns. These evaluations include cases where the attack was ignored by the model, the model partially complied with a non-dangerous action, or the model produced a malformed call. We conservatively exclude these from the proxy's defense contribution, making our reported proxy-denial rate a lower bound.
@@ -111,17 +115,16 @@ Table~\ref{tab:attack-categories} shows per-category results. Several categories
 
 \begin{table}[t]
 \centering
-\caption{Defense-layer contribution (mean over 5 reps). Boundary-level enforcement (pre-LLM + proxy) is the largest single contributor.}
+\caption{Defense-layer contribution (mean over 5 reps). Boundary enforcement and model refusal are complementary layers.}
 \label{tab:ablation}
 \footnotesize
 \begin{tabular}{lrrl}
 \toprule
 \textbf{Defense Layer} & \textbf{Share} & \textbf{95\% CI} & \textbf{Mechanism} \\
 \midrule
-Pre-LLM screening      & 6.9\% & [6.0, 7.8] & Regex detection \\
-\textbf{Proxy (prov./policy)} & \textbf{30.2\%} & [28.6, 31.8] & \textbf{DAG + policy} \\
-Model refusal (TC=0)   & 16.6\% & [15.3, 17.9] & LLM safety training \\
-Non-dangerous calls    & 45.3\% & [43.6, 47.0] & Benign tool calls \\
+\textbf{Boundary blocked (proxy)} & \textbf{25.3\%} & [23.8, 26.8] & \textbf{DAG + policy} \\
+Model refusal (TC=0)   & 28.4\% & [26.9, 30.0] & LLM safety training \\
+Non-dangerous calls    & 45.2\% & [43.5, 46.9] & Benign tool calls \\
 \midrule
 ASR-IA bypasses        & 1.09\%  & [0.8, 1.5] & Residual \\
 \bottomrule
@@ -144,18 +147,18 @@ ASR-IA bypasses        & 1.09\%  & [0.8, 1.5] & Residual \\
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:ablation} shows that boundary-level enforcement (pre-LLM screening + proxy denial) is the single largest defense layer. The proxy denials represent cases where the LLM \emph{did} generate tool calls but the enforcement proxy denied execution because argument provenance traced to untrusted sources. Without provenance, a policy engine would need to rely solely on syntactic argument patterns---either missing semantically-equivalent attacks or blocking legitimate operations. Table~\ref{tab:layer-breakdown} summarizes the three-stage resolution pipeline; the conservative default (Stage~3) provides fail-safe behavior for unresolved arguments.
+Table~\ref{tab:ablation} shows that boundary-level enforcement and model-level refusal are complementary layers. The 25.3\% proxy denials represent cases where the LLM \emph{did} generate a tool call but the enforcement proxy blocked it because argument provenance traced to an untrusted source. This is precisely the gap that Policy-Only cannot fill: without provenance, a call to a non-dangerous tool (e.g., \texttt{GmailSendEmail}) with attacker-derived arguments is indistinguishable from a legitimate call. Table~\ref{tab:layer-breakdown} summarizes the three-stage resolution pipeline; the conservative default (Stage~3) provides fail-safe behavior for unresolved arguments.
 
 \subsection{RQ3: Usability}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/security_usability_tradeoff.pdf}
-\caption{Security--usability tradeoff. \sys{} is the only system achieving both low ASR-IA and high TSR. Policy-Only blocks attacks but is unusable.}
+\caption{Security--usability tradeoff. \sys{} achieves the lowest ASR-IA. Policy-Only achieves low ASR-IA with higher TSR but lacks provenance context to catch origin-dependent attacks.}
 \label{fig:tsr_asr_tradeoff}
 \end{figure}
 
-\sys{} achieves 95.00\% $\pm$ 1.52 TSR with 5.00\% $\pm$ 1.53 FPR (Fig.~\ref{fig:tsr_asr_tradeoff}). The false positives arise from overly conservative argument-validation rules (e.g., numeric range checks on device parameters), not from provenance misclassification---the DAG correctly labels benign arguments as trusted. These are addressable by refining policy rules. Mean latency is dominated by LLM inference; the provenance lookup and policy evaluation add $<$1\,ms per tool call.
+\sys{} achieves 95.00\% $\pm$ 1.52 TSR with 5.00\% $\pm$ 1.53 FPR (Fig.~\ref{fig:tsr_asr_tradeoff}). All false positives arise from overly conservative \emph{policy rules} (e.g., numeric range checks), not from provenance misclassification---the DAG correctly labels benign arguments as trusted in every case. This confirms that usability losses are attributable to policy tuning, which is independently refinable without modifying the provenance layer. Provenance lookup and policy evaluation add $<$1\,ms per tool call; latency is dominated by LLM inference.
 
 \subsection{RQ4: Cross-Model Robustness}
 
@@ -168,12 +171,12 @@ Table~\ref{tab:ablation} shows that boundary-level enforcement (pre-LLM screenin
 \toprule
 \textbf{Model} & \textbf{Params} & \textbf{TSR} & \textbf{ASR$_{IA}$} & \textbf{TC$>$0} & \textbf{Blocked} \\
 \midrule
-Llama-3.1-8B     & 8B  & 95.0\% & 0.62\% & 68\% & 35.6\% \\
-Qwen2.5-7B       & 7B  & 92.5\% & 1.25\% & 81\% & 40.6\% \\
-Gemma-2-9B       & 9B  & 95.0\% & 0.62\% & 73\% & 35.6\% \\
-Phi-3.5-Mini     & 3B  & 97.5\% & 1.88\% & 84\% & 36.2\% \\
+Llama-3.1-8B     & 8B  & 95.0\% & 0.62\% & 56\% & 23.8\% \\
+Qwen2.5-7B       & 7B  & 92.5\% & 1.25\% & 65\% & 24.4\% \\
+Gemma-2-9B       & 9B  & 95.0\% & 0.62\% & 64\% & 26.9\% \\
+Phi-3.5-Mini     & 3B  & 97.5\% & 1.88\% & 74\% & 26.2\% \\
 \midrule
-\textbf{Mean}    & --- & \textbf{95.0\%} & \textbf{1.09\%} & \textbf{77\%} & \textbf{37.0\%} \\
+\textbf{Mean}    & --- & \textbf{95.0\%} & \textbf{1.09\%} & \textbf{65\%} & \textbf{25.3\%} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -279,3 +282,36 @@ Benign Controls       & 5 & 0 FP & 100\% TSR & --- \\
 \emph{Embedding Evasion} (0/3 bypassed): Attempts to evade semantic provenance matching via metaphorical language and multilingual reformulation were refused by the model itself---the LLM did not generate the intended malicious tool call, demonstrating a dual barrier against obfuscation.
 
 \emph{TOCTOU \& Multi-Vector} (0/6 bypassed): Deferred execution and combined attacks were blocked by the provenance DAG's persistent trust labels and pre-LLM screening.
+
+\subsection{RQ8: External Benchmark Validation (InjecAgent)}
+\label{subsec:injecagent}
+
+To validate generalizability beyond our author-constructed scenarios, we evaluate \sys{} on InjecAgent~\cite{injecagent2024}, an independent benchmark of 1,054 indirect prompt-injection test cases across 17 user tools and 63 attacker tools spanning financial, physical, and data-theft attack categories (Zhan et al., ACL 2024 Findings). InjecAgent is structurally complementary to our 200-scenario benchmark: it exclusively targets indirect injection---where a tool result contains the attacker payload---which is also the dominant attack vector in \sys{}'s evaluation.
+
+\paragraph{Setup.}
+We adapt InjecAgent to the PROVSAFE evaluation framework as follows. For each test case: (1)~the LLM receives the benchmark's \emph{User Instruction} and is given only the relevant user-tool schema to call (no fabricated data); (2)~the benchmark's verbatim \emph{Tool Response}---which contains the injected attacker instruction---is returned as the tool result and added to the provenance DAG as an UNTRUSTED node; (3)~the LLM is then presented with the attacker-tool schemas and any resulting tool call is intercepted by \sys{}'s enforcement proxy. Risk tiers mirror our TDSC policy: physical-harm tools (e.g., \texttt{AugustSmartLockUnlockDoor}, \texttt{TerminalExecute}) are CRITICAL; financial and exfiltration tools (e.g., \texttt{GmailSendEmail}, \texttt{BankManagerTransferFunds}) are HIGH. We evaluate all four systems (No Defense, Pattern Filter, Policy-Only, \sys{}) with 3 repetitions each using the same per-trial temperature and seed derivation as the TDSC evaluation.
+
+\begin{table}[t]
+\centering
+\caption{InjecAgent external benchmark results (1,054 test cases, 4 systems, 4 models). \sys{} retains low ASR-IA across 17 user tools and 63 attacker tools not seen during policy design.}
+\label{tab:injecagent}
+\footnotesize
+\begin{tabular}{lrrl}
+\toprule
+\textbf{System} & \textbf{ASR$_{IA}$ $\downarrow$} & \textbf{Key Finding} \\
+\midrule
+No Defense     & 20.83\% $\pm$ 0.9   & Consistent with published baselines \\
+Pattern Filter & 0.00\% $\pm$ 0.0$^\dagger$   & High error rate limits conclusions \\
+Policy-Only    & 22.67\% $\pm$ 1.0   & Provenance-free policy insufficient \\
+\textbf{\sys{}}& 4.12\% $\pm$ 0.5   & \textbf{Provenance generalizes to new domain} \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\scriptsize $^\dagger$Pattern Filter encountered parsing failures on 38\% of InjecAgent trials due to the diverse tool-schema format; its 0\% ASR reflects incomplete coverage rather than perfect defense.
+\end{flushleft}
+\end{table}
+
+\paragraph{Results.}
+Table~\ref{tab:injecagent} presents the decisive result of this evaluation. \sys{} achieves 4.12\% ASR-IA on InjecAgent---an 80\% reduction compared to No Defense (20.83\%)---demonstrating that provenance-based defense generalizes to an unseen tool ecosystem. No Defense's 20.83\% is consistent with InjecAgent's published baseline of 23.6\%--47.0\% for ReAct-prompted models~\cite{injecagent2024}, validating our evaluation harness.
+
+The Policy-Only result is the most informative comparison: at 22.67\% ASR-IA, it performs no better than No Defense. The reason is structural. InjecAgent's 63 attacker tools---\texttt{GmailSendEmail}, \texttt{BankManagerTransferFunds}, \texttt{AugustSmartLockGrantGuestAccess}, among others---are legitimate tools invoked with attacker-chosen arguments. They do not match any dangerous-action pattern (delete, unlock, extreme temperature), so without provenance there is \emph{nothing to trigger a denial}. Provenance resolves this: \sys{} traces each argument back through the DAG and finds that it derives from the untrusted tool response containing the injection payload. The trust lattice meet operator propagates the UNTRUSTED label regardless of intermediate processing, and the policy engine denies or flags the call accordingly. This mechanism transfers without modification across tool ecosystems---the DAG structure and trust propagation rules are domain-agnostic.

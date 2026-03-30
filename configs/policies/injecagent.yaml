@@ -1,0 +1,148 @@
+# injecagent.yaml — PROVSAFE policy for InjecAgent evaluation
+#
+# Mirrors the logic of provsafe.yaml but uses InjecAgent tool names instead
+# of the smart-home/filesystem tools from the TDSC evaluation.
+#
+# Rule semantics:
+#   - has_untrusted_provenance: true  → argument traces to an untrusted TOOL_RESULT node
+#   - risk_tier: critical/high/medium → tool's inherent danger level
+#   - first-match semantics; unmatched HIGH/CRITICAL tools default to CONFIRM
+
+default_allow: false
+
+risk_tiers:
+  critical:
+    - AugustSmartLockUnlockDoor
+    - AugustSmartLockGrantGuestAccess
+    - TerminalExecute
+    - TrafficControlManageTrafficLightState
+    - TrafficControlGivePriorityToEmergencyVehicle
+    - EmergencyDispatchSystemCreateDispatchRequest
+    - IndoorRobotGoToRoom
+    - GoogleHomeScheduleDeviceAction
+  high:
+    - BankManagerTransferFunds
+    - BankManagerPayBill
+    - BankManagerGetAccountInformation
+    - BankManagerSearchPayee
+    - BinancePlaceOrder
+    - BinanceWithdraw
+    - BinanceDeposit
+    - BinanceGetOrderHistory
+    - VenmoWithdrawMoney
+    - VenmoListLinkedAccounts
+    - TDAmeritradeGetHoldingsInformation
+    - InvestmentManagerGetHoldingsInformation
+    - GmailSendEmail
+    - GitHubDeleteRepository
+    - FacebookManagerUpdateUserProfile
+    - NortonIdentitySafeSharePassword
+    - NortonIdentitySafeDisableTwoFactorAuthentication
+    - EvernoteManagerManageNoteSharingLevel
+    - FedExShipManagerManageShipment
+    - CiscoUmbrellaCreatePolicy
+    - CiscoUmbrellaUpdatePolicy
+    - DeepfakeGeneratorGenerateAudioDeepfake
+    - EpicFHIRManagePatientRecords
+    - EpicFHIRManageClinicalDocuments
+    - EpicFHIRManageAppointments
+    - The23andMeUpdateData
+    - The23andMeShareData
+  medium:
+    - NortonIdentitySafeSearchPasswords
+    - NortonIdentitySafeAutoFillPersonalInfo
+    - AmazonViewSavedPaymentMethods
+    - AmazonViewSavedAddresses
+    - AugustSmartLockViewAccessHistory
+    - SpokeoSearchPeople
+    - SpokeoDownloadPublicRecord
+    - FacebookManagerGetUserProfile
+    - FacebookManagerSearchFriends
+    - GoogleMapGetCurrentLocation
+    - GoogleSearchGetSearchHistory
+    - TeladocAccessUserInfo
+    - TeladocViewPrescriptions
+    - EpicFHIRGetPatientDetails
+    - EpicFHIRDownloadFiles
+    - The23andMeGetGeneticData
+    - The23andMeGetHealthRecommendations
+    - The23andMeDownloadData
+    - DropboxGetItemMetadata
+    - DropboxListFilesAndFolders
+    - DropboxMoveItem
+    - ExpediaSearchReservations
+    - CiscoUmbrellaGetLogDetails
+    - GitHubGetUserDetails
+    - TwilioGetPhoneNumberInfo
+    - SlackLeaveChannel
+    - WebBrowserSearchHistory
+
+rules:
+  # CRITICAL tools with untrusted provenance → always deny
+  - name: deny_critical_untrusted
+    tools: [AugustSmartLockUnlockDoor, AugustSmartLockGrantGuestAccess,
+            TerminalExecute, TrafficControlManageTrafficLightState,
+            TrafficControlGivePriorityToEmergencyVehicle,
+            EmergencyDispatchSystemCreateDispatchRequest,
+            IndoorRobotGoToRoom, GoogleHomeScheduleDeviceAction]
+    conditions:
+      has_untrusted_provenance: true
+    action: DENY
+
+  # CRITICAL tools with trusted provenance → require confirmation
+  - name: confirm_critical_trusted
+    tools: [AugustSmartLockUnlockDoor, AugustSmartLockGrantGuestAccess,
+            TerminalExecute, TrafficControlManageTrafficLightState,
+            TrafficControlGivePriorityToEmergencyVehicle,
+            EmergencyDispatchSystemCreateDispatchRequest,
+            IndoorRobotGoToRoom, GoogleHomeScheduleDeviceAction]
+    conditions: {}
+    action: REQUIRE_CONFIRMATION
+
+  # HIGH tools with untrusted provenance → require confirmation (user must approve)
+  - name: confirm_high_untrusted
+    tools: [BankManagerTransferFunds, BankManagerPayBill, BankManagerGetAccountInformation,
+            BankManagerSearchPayee, BinancePlaceOrder, BinanceWithdraw, BinanceDeposit,
+            BinanceGetOrderHistory, VenmoWithdrawMoney, VenmoListLinkedAccounts,
+            TDAmeritradeGetHoldingsInformation, InvestmentManagerGetHoldingsInformation,
+            GmailSendEmail, GitHubDeleteRepository, FacebookManagerUpdateUserProfile,
+            NortonIdentitySafeSharePassword, NortonIdentitySafeDisableTwoFactorAuthentication,
+            EvernoteManagerManageNoteSharingLevel, FedExShipManagerManageShipment,
+            CiscoUmbrellaCreatePolicy, CiscoUmbrellaUpdatePolicy,
+            DeepfakeGeneratorGenerateAudioDeepfake, EpicFHIRManagePatientRecords,
+            EpicFHIRManageClinicalDocuments, EpicFHIRManageAppointments,
+            The23andMeUpdateData, The23andMeShareData]
+    conditions:
+      has_untrusted_provenance: true
+    action: REQUIRE_CONFIRMATION
+
+  # MEDIUM tools with untrusted provenance → require confirmation
+  - name: confirm_medium_untrusted
+    tools: [NortonIdentitySafeSearchPasswords, NortonIdentitySafeAutoFillPersonalInfo,
+            AmazonViewSavedPaymentMethods, AmazonViewSavedAddresses,
+            AugustSmartLockViewAccessHistory, SpokeoSearchPeople, SpokeoDownloadPublicRecord,
+            FacebookManagerGetUserProfile, FacebookManagerSearchFriends,
+            GoogleMapGetCurrentLocation, GoogleSearchGetSearchHistory,
+            TeladocAccessUserInfo, TeladocViewPrescriptions,
+            EpicFHIRGetPatientDetails, EpicFHIRDownloadFiles,
+            The23andMeGetGeneticData, The23andMeGetHealthRecommendations,
+            The23andMeDownloadData, DropboxGetItemMetadata, DropboxListFilesAndFolders,
+            DropboxMoveItem, ExpediaSearchReservations, CiscoUmbrellaGetLogDetails,
+            GitHubGetUserDetails, TwilioGetPhoneNumberInfo, SlackLeaveChannel,
+            WebBrowserSearchHistory]
+    conditions:
+      has_untrusted_provenance: true
+    action: REQUIRE_CONFIRMATION
+
+  # User tools (read-only fetch operations) — allow with trusted or unknown provenance
+  - name: allow_user_tools
+    tools: [AmazonGetProductDetails, EvernoteManagerSearchNotes,
+            GitHubGetRepositoryDetails, GitHubSearchRepositories,
+            GmailReadEmail, GmailSearchEmails,
+            GoogleCalendarGetEventsFromSharedCalendar, GoogleCalendarReadEvents,
+            ShopifyGetProductDetails, TeladocViewReviews, TodoistSearchTasks,
+            TwilioGetReceivedSmsMessages, TwitterManagerGetUserProfile,
+            TwitterManagerReadTweet, TwitterManagerSearchTweets,
+            WebBrowserNavigateTo]
+    conditions: {}
+    action: ALLOW
