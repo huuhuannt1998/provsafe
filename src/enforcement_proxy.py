@@ -217,6 +217,7 @@ class EnforcementProxy:
             provenance_summary={
                 "has_untrusted_args": provenance_info["has_untrusted_args"],
                 "untrusted_args": provenance_info["untrusted_arg_names"],
+                "provenance_by_arg": provenance_info.get("provenance_by_arg", {}),
             },
             policy_latency_ms=policy_latency_ms,
             tool_latency_ms=tool_latency_ms,

@@ -1,0 +1,34 @@
+{
+  "no_defense": {
+    "asr": 7.25,
+    "tsr": 100.0,
+    "n_attack": 800,
+    "n_benign": 200,
+    "succ_attacks": 58,
+    "succ_benign": 200
+  },
+  "pattern_filter": {
+    "asr": 1.25,
+    "tsr": 100.0,
+    "n_attack": 800,
+    "n_benign": 200,
+    "succ_attacks": 10,
+    "succ_benign": 200
+  },
+  "policy_only": {
+    "asr": 0.12,
+    "tsr": 100.0,
+    "n_attack": 800,
+    "n_benign": 200,
+    "succ_attacks": 1,
+    "succ_benign": 200
+  },
+  "provsafe": {
+    "asr": 0.0,
+    "tsr": 100.0,
+    "n_attack": 800,
+    "n_benign": 200,
+    "succ_attacks": 0,
+    "succ_benign": 200
+  }
+}

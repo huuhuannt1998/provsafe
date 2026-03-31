@@ -59,6 +59,13 @@ _GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 _GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 
+# Open WebUI (university cluster — large models)
+_OPENWEBUI_URL = os.environ.get(
+    "OPENWEBUI_URL",
+    "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions",
+)
+_OPENWEBUI_KEY = os.environ.get("OPENWEBUI_API_KEY", "")
+
 
 # ── Model → Provider mapping ────────────────────────────────────────────────
 
@@ -80,8 +87,15 @@ GEMINI_MODELS = [
     "gemini-1.5-flash",
 ]
 
+# Open WebUI models (university cluster — large models)
+OPENWEBUI_MODELS = [
+    "qwen3.5-122b",
+    "gpt-oss-120b",
+    "qwen3.5-397b",
+]
+
 # All available models
-ALL_MODELS = LMSTUDIO_MODELS + GROQ_MODELS + GEMINI_MODELS
+ALL_MODELS = LMSTUDIO_MODELS + GROQ_MODELS + GEMINI_MODELS + OPENWEBUI_MODELS
 
 
 def get_provider_config(model: str) -> ProviderConfig:
@@ -123,6 +137,19 @@ def get_provider_config(model: str) -> ProviderConfig:
             api_key=_GEMINI_KEY,
             model=model,
             rate_limit_rpm=15,  # Gemini free tier: 15 req/min
+        )
+    elif model in OPENWEBUI_MODELS:
+        if not _OPENWEBUI_KEY:
+            raise ValueError(
+                f"OPENWEBUI_API_KEY environment variable is required for model '{model}'. "
+                "Set it in evaluation/.env or export it."
+            )
+        return ProviderConfig(
+            provider="openwebui",
+            api_url=_OPENWEBUI_URL,
+            api_key=_OPENWEBUI_KEY,
+            model=model,
+            rate_limit_rpm=0,  # University cluster: no explicit rate limit
         )
     else:
         raise ValueError(
@@ -225,6 +252,15 @@ def call_llm(
         The full JSON response dict from the API.
     """
     config = get_provider_config(model)
+
+    # Thinking models (Qwen3.5, etc.) need higher max_tokens because
+    # reasoning tokens are consumed before content is produced
+    if config.provider == "openwebui" and max_tokens < 2000:
+        max_tokens = 2000
+
+    # Longer timeout for large models on cluster
+    if config.provider == "openwebui" and timeout < 120:
+        timeout = 120
 
     # Respect rate limits
     _rate_limiter.wait_if_needed(config.provider, config.rate_limit_rpm)

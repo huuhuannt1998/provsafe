@@ -176,6 +176,7 @@ def evaluate_single(
             "blocked": result.get("blocked", False),
             "attack_success": result.get("attack_success", False),
             "error": result.get("error"),
+            "resolution_stages": result.get("resolution_stages"),
         }
     except Exception as e:
         return {

@@ -1,0 +1,14 @@
+{
+  "models": [
+    "meta-llama-3.1-8b-instruct"
+  ],
+  "systems": [
+    "provsafe"
+  ],
+  "n_scenarios": 200,
+  "n_reps": 5,
+  "temperature": 0.0,
+  "total_trials": 1000,
+  "timestamp": "20260330_200435",
+  "encoding_decoder": "v2_canonicalize"
+}

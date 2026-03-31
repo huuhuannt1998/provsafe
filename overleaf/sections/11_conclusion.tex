@@ -4,9 +4,9 @@
 We presented \sys{}, a provenance-gated policy enforcement framework for tool-using LLM agents. By maintaining a provenance DAG grounded in the W3C PROV Data Model with trust annotations propagated via a lattice meet operator, \sys{} enables policies that distinguish tool calls originating from trusted user commands versus those derived from attacker-controlled content---even when the calls are syntactically identical. This shifts the security perimeter from the unreliable prompt layer to the tool-call boundary, where deterministic enforcement is possible.
 
 \paragraph{Key Results.}
-Our evaluation across 16{,}000 total trials (200 scenarios $\times$ 4 models $\times$ 4 systems $\times$ 5 reps) plus 1{,}054 external InjecAgent benchmark cases demonstrates:
+Our evaluation across 20{,}000 total trials (200 scenarios $\times$ 5 models $\times$ 4 systems $\times$ 5 reps) plus 1{,}054 external InjecAgent benchmark cases demonstrates:
 \begin{itemize}[leftmargin=1.2em]
-  \item \sys{} achieves 1.09\% $\pm$ 0.36 ASR-IA with 95.00\% $\pm$ 1.52 TSR (95\% CI), consistent across four model families (3B--9B parameters).
+  \item \sys{} achieves 1.09\% $\pm$ 0.36 ASR-IA with 95.00\% $\pm$ 1.52 TSR (95\% CI) on 3B--9B models, and \textbf{0.00\% ASR-IA} on a 122B model---demonstrating scalability across a 40$\times$ parameter range.
   \item Boundary enforcement and model-level safety training are complementary layers, together preventing over 53\% of attacks.
   \item On InjecAgent, Policy-Only degrades to 22.67\% ASR---no better than No Defense---because attacker tools are not syntactically dangerous. \sys{} reduces ASR to 4.12\%, demonstrating that provenance is the indispensable defense layer when attacks use legitimate tools with attacker-derived arguments.
   \item Embedding-enhanced provenance closes the paraphrase gap (52.1\% $\to$ 0\% paraphrase ASR) with $<$5\,ms overhead.

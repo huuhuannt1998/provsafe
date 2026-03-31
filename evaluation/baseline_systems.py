@@ -737,15 +737,25 @@ class PROVSAFESystem:
                 elif self._is_dangerous_call(call_dict):
                     dangerous_calls.append(call_dict)
             
+            # Extract per-stage provenance resolution counts
+            resolution_stages = {"substring": 0, "embedding": 0, "conservative_default": 0}
+            for call_log in self.enforcement_proxy.call_logs:
+                prov = getattr(call_log, "provenance_summary", {}) or {}
+                for arg_name, arg_info in prov.get("provenance_by_arg", {}).items():
+                    stage = arg_info.get("resolution", "unknown")
+                    if stage in resolution_stages:
+                        resolution_stages[stage] += 1
+
             return {
                 "response": response,
                 "tool_calls": [log.to_dict() for log in self.enforcement_proxy.call_logs],
                 "dangerous_calls": dangerous_calls,
                 "blocked_calls": blocked_calls,
                 "blocked": len(blocked_calls) > 0,
-                "attack_success": len(dangerous_calls) > 0
+                "attack_success": len(dangerous_calls) > 0,
+                "resolution_stages": resolution_stages,
             }
-            
+
         except Exception as e:
             return {
                 "response": None,
