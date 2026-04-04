@@ -247,10 +247,11 @@
 }
 
 @misc{llama,
-  title={LLaMA: Open and Efficient Foundation Language Models},
-  author={Touvron, Hugo and Lavril, Thibaut and Izacard, Gautier and others},
-  year={2023},
-  howpublished={\url{https://arxiv.org/abs/2302.13971}}
+  title={The {Llama} 3 Herd of Models},
+  author={{Meta AI}},
+  year={2024},
+  howpublished={\url{https://arxiv.org/abs/2407.21783}},
+  note={Llama~3.1 model family including the 8B-Instruct variant used in this evaluation}
 }
 
 @misc{openai-gpt4,
@@ -260,14 +261,6 @@
   howpublished={\url{https://arxiv.org/abs/2303.08774}}
 }
 
-% Rebuff (evaluation reference)
-@misc{rebuff2023,
-  author = {{ProtectAI}},
-  title = {Rebuff: Self-Hardening Prompt Injection Detector},
-  year = {2023},
-  howpublished = {\url{https://github.com/protectai/rebuff}},
-  note = {Accessed: 2026-01-04}
-}
 
 % Prompt Injection Defense Papers
 @article{spotlighting2024,
@@ -286,13 +279,21 @@
   note={Benchmark showing GPT-4 vulnerable to 24\% of indirect injections}
 }
 
-% Invariant - tool-call level injection detection
-@inproceedings{invariant2024,
+% Signed-Prompt - signed prompt approach to prevent injection
+@inproceedings{signedprompt2024,
   author = {Suo, Daniel and Fang, Alvin and Roth, Dan and Lee, Kai-Wei},
   title = {Signed-Prompt: A New Approach to Prevent Prompt Injection Attacks Against {LLM}-Integrated Applications},
   booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year = {2024}
+}
+
+% Invariant - formal security guarantees for AI agents
+@inproceedings{invariant2024,
+  author = {Balunovic, Mislav and Beurer-Kellner, Luca and Fischer, Marc and Vechev, Martin},
+  title = {{AI} Agents with Formal Security Guarantees},
+  booktitle = {ICML 2024 Next Generation of AI Safety Workshop},
   year = {2024},
-  note = {Tool-call level invariant analysis for prompt injection detection}
+  url = {https://openreview.net/forum?id=c6jNHPksiZ}
 }
 
 % Bing Chat Sydney incident

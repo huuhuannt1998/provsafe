@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # watch_and_update.sh
-# Wait for the TDSC experiment (PID $1) to finish, then update paper numbers.
+# Wait for the experiment (PID $1) to finish, then update paper numbers.
 
 set -euo pipefail
 
 PID=${1:-89023}
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-LOG="$REPO/results/tdsc_full_v2_watch.log"
+LOG="$REPO/results/watch.log"
 
 echo "[$(date)] Watching PID $PID for experiment completion..." | tee -a "$LOG"
 
@@ -17,8 +17,8 @@ done
 
 echo "[$(date)] PID $PID has exited. Checking for results..." | tee -a "$LOG"
 
-REPORT="$REPO/results/tdsc_full_v2/tdsc_report.json"
-ALL_RESULTS="$REPO/results/tdsc_full_v2/all_results.json"
+REPORT="$REPO/results/tdsc_full/report.json"
+ALL_RESULTS="$REPO/results/tdsc_full/all_results.json"
 
 # Give the process a moment to flush writes
 sleep 5
@@ -30,7 +30,7 @@ if [[ -f "$REPORT" ]]; then
     python scripts/update_paper_numbers.py 2>&1 | tee -a "$LOG"
     echo "[$(date)] Paper update complete." | tee -a "$LOG"
 elif [[ -f "$ALL_RESULTS" ]]; then
-    echo "[$(date)] No tdsc_report.json; computing stats from all_results.json..." | tee -a "$LOG"
+    echo "[$(date)] No report.json; computing stats from all_results.json..." | tee -a "$LOG"
 
     # Generate the report from raw results
     cd "$REPO"
@@ -40,7 +40,7 @@ import json, math
 from pathlib import Path
 
 REPO = Path(".")
-raw = json.loads((REPO / "results/tdsc_full_v2/all_results.json").read_text())
+raw = json.loads((REPO / "results/tdsc_full/all_results.json").read_text())
 
 def wilson_ci(k, n, z=1.96):
     if n == 0: return 0.0
@@ -93,7 +93,7 @@ for key, d in cat_data.items():
     }
 
 report = {"aggregate": agg, "per_category": per_cat}
-out = REPO / "results/tdsc_full_v2/tdsc_report.json"
+out = REPO / "results/tdsc_full/report.json"
 out.write_text(json.dumps(report, indent=2))
 print(f"Report written to {out}")
 PYEOF

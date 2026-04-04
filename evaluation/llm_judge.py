@@ -9,8 +9,8 @@ Reports Cohen's kappa inter-rater agreement between the heuristic
 and LLM judge classifications.
 
 Usage:
-    python llm_judge.py --results ../results/tdsc_full_v2/all_results.json
-    python llm_judge.py --results ../results/tdsc_full_v2/all_results.json --sample 200
+    python llm_judge.py --results ../results/full/all_results.json
+    python llm_judge.py --results ../results/full/all_results.json --sample 200
     python llm_judge.py --results ../results/injecagent/all_results.json --judge-model gemini-1.5-flash
 """
 
@@ -252,7 +252,7 @@ def main():
     parser.add_argument(
         "--results",
         type=str,
-        default=str(REPO / "results" / "tdsc_full_v2" / "all_results.json"),
+        default=str(REPO / "results" / "full" / "all_results.json"),
         help="Path to all_results.json",
     )
     parser.add_argument(

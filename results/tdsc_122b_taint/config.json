@@ -1,0 +1,14 @@
+{
+  "models": [
+    "qwen3.5-122b"
+  ],
+  "systems": [
+    "taint_everything"
+  ],
+  "n_scenarios": 212,
+  "n_reps": 5,
+  "temperature": 0.0,
+  "total_trials": 1060,
+  "timestamp": "20260402_224120",
+  "encoding_decoder": "v2_canonicalize"
+}

@@ -1,0 +1,17 @@
+{
+  "models": [
+    "qwen3.5-122b"
+  ],
+  "systems": [
+    "no_defense",
+    "pattern_filter",
+    "policy_only",
+    "provsafe"
+  ],
+  "n_scenarios": 20,
+  "n_reps": 2,
+  "temperature": 0.0,
+  "total_trials": 160,
+  "timestamp": "20260401_221545",
+  "encoding_decoder": "v2_canonicalize"
+}

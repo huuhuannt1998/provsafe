@@ -3,7 +3,7 @@
 
 \subsection{Policy Language}
 
-\sys{} policies are expressed in YAML for readability. This section details the constructs.
+\sys{} policies are expressed in YAML for accessibility to operators who are not security specialists; integration with formal policy languages such as Rego or Cedar is future work. This section details the constructs.
 
 \paragraph{Risk Tiers.}
 Tools are categorized by inherent risk: LOW (read-only, e.g., \texttt{fs.read}), MEDIUM (create/modify, e.g., \texttt{fs.write}), HIGH (destructive/exfiltrating, e.g., \texttt{fs.delete}, \texttt{email.send}), and CRITICAL (system-level, e.g., \texttt{device.reboot}).
@@ -32,7 +32,7 @@ rules:
 \end{verbatim}
 
 \paragraph{Evaluation Semantics.}
-Rules are evaluated top-to-bottom; the first matching rule determines the action. If no rule matches, defaults apply: HIGH/CRITICAL tools require confirmation, while LOW/MEDIUM tools are allowed. The fail-safe guarantee is conservative trust labeling (unknown provenance $\to$ UNTRUSTED), while the final ALLOW/DENY/CONFIRM outcome remains policy-dependent.
+Rules are evaluated top-to-bottom; the first matching rule determines the action (\emph{first-match semantics}). First-match evaluation requires careful rule ordering---a broad ALLOW rule placed before a narrow DENY rule can inadvertently shadow the denial. Our policy templates ship with a linting tool that detects shadowed rules. If no rule matches, defaults apply: HIGH/CRITICAL tools require confirmation, while LOW/MEDIUM tools are allowed. The fail-safe guarantee is conservative trust labeling (unknown provenance $\to$ UNTRUSTED), while the final ALLOW/DENY/CONFIRM outcome remains policy-dependent.
 
 \subsection{Provenance Tracking}
 
@@ -57,7 +57,10 @@ Nodes are created at four points: (1)~when the user issues a command (INPUT, $T 
 
 \paragraph{Trust Propagation.}
 Trust labels propagate via the lattice meet ($\sqcap$) over ancestors:
-$$T(v) = \bigsqcap_{u \in \text{ancestors}(v)} T(u) = \begin{cases} \top & \text{if } \forall u \in \text{ancestors}(v) : T(u) = \top \\ \bot & \text{otherwise} \end{cases}$$
+\begin{equation}
+\label{eq:trust-propagation}
+T(v) = \sqcap_{u \in \text{ancestors}(v)} T(u) = \begin{cases} \top & \text{if } \forall u \in \text{ancestors}(v) : T(u) = \top \\ \bot & \text{otherwise} \end{cases}
+\end{equation}
 This conservative propagation ensures monotonicity: once a node acquires the $\bot$ (UNTRUSTED) label through any ancestor, no subsequent derivation can restore $\top$ without explicit user declassification (a controlled \emph{downgrading} operation~\cite{difc-survey}).
 
 \paragraph{Why a Two-Element Lattice Suffices.}
@@ -71,7 +74,7 @@ We state three formal properties of the provenance model:
 \end{enumerate}
 
 \paragraph{Provenance Queries.}
-At decision time, the policy engine queries the graph via three operations that correspond to standard provenance interrogation~\cite{cheney2009provenance}: \texttt{get\_sources(c)} returns all source nodes reachable from tool call $c$ (why-provenance); \texttt{is\_trusted(c)} computes $\bigsqcap_{u \in \text{ancestors}(c)} T(u)$; \texttt{get\_untrusted\_sources(c)} returns specific $\bot$-labeled sources for user-facing explanations (a restricted form of where-provenance). All queries use BFS over ancestor edges in $O(|V| + |E|)$; in practice, graph depth is 5--10 and $|V| < 100$ per session.
+At decision time, the policy engine queries the graph via three operations that correspond to standard provenance interrogation~\cite{cheney2009provenance}: \texttt{get\_sources(c)} returns all source nodes reachable from tool call $c$ (why-provenance); \texttt{is\_trusted(c)} computes $\sqcap_{u \in \text{ancestors}(c)} T(u)$; \texttt{get\_untrusted\_sources(c)} returns specific $\bot$-labeled sources for user-facing explanations (a restricted form of where-provenance). All queries use BFS over ancestor edges in $O(|V| + |E|)$; in practice, graph depth is 5--10 and $|V| < 100$ per session.
 
 \paragraph{Provenance Resolution Pipeline.}
 Provenance resolution determines whether a tool-call argument traces to untrusted content. \sys{} uses a three-stage pipeline as the default configuration:

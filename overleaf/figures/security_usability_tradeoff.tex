@@ -73,23 +73,27 @@
 \node[nodefcolor, font=\LARGE] at (95.00*\xscale, 1.09*\yscale) {$\star$};
 \node[anchor=west, font=\small\bfseries, nodefcolor] at (96*\xscale, 1.09*\yscale) {PROVSAFE Avg};
 
-% Prior work region (approximate)
-\fill[nodefcolor!15] (80*\xscale, 5*\yscale) rectangle (100*\xscale, 15*\yscale);
-\node[font=\scriptsize, nodefcolor!50!black] at (90*\xscale, 10*\yscale) {Prior Prompt-Level};
-\node[font=\scriptsize, nodefcolor!50!black] at (90*\xscale, 8.5*\yscale) {Defenses (14--55\% ASR)};
+% Baseline data points (measured)
+% No Defense: TSR=99.38, ASR=25.94 -- off chart (ASR>15), place at top edge
+\fill[nodefcolor] (99.38*\xscale, 15*\yscale) circle (0.18);
+\node[anchor=south east, font=\small\bfseries, nodefcolor] at (99*\xscale, 14.5*\yscale) {No Defense};
+\node[anchor=north east, font=\scriptsize, nodefcolor!70!black] at (99*\xscale, 15*\yscale) {25.9\% ASR$\uparrow$};
 
-% Arrow from prior work to PROVSAFE
-\draw[->, thick, gray!60, dashed] (90*\xscale, 5.5*\yscale) -- (94*\xscale, 2.0*\yscale);
-\node[above, font=\scriptsize, gray!70!black, rotate=-50] at (90*\xscale, 4*\yscale) {Provenance enables};
+% Pattern Filter: TSR=99.38, ASR=7.50
+\fill[patterncolor!80!black] (99.38*\xscale, 7.50*\yscale) circle (0.18);
+\node[anchor=west, font=\small, patterncolor!80!black] at (99.8*\xscale, 7.50*\yscale) {Pattern Filter};
+
+% Policy-Only: TSR=97.50, ASR=1.88
+\fill[policycolor!70!black] (97.50*\xscale, 1.88*\yscale) circle (0.18);
+\node[anchor=south east, font=\small, policycolor!70!black] at (97*\xscale, 2.2*\yscale) {Policy-Only};
 
 % Legend box
 \node[draw, rounded corners, fill=white, font=\footnotesize, align=left, anchor=north west] at (0.5, 6.8) {
-    \textcolor{provsafecolor}{$\bullet$} \textbf{Llama-3.1-8B} (0.62\% ASR-IA)\\[2pt]
-    \textcolor{policycolor}{$\bullet$} Qwen2.5-7B (1.25\% ASR-IA)\\[2pt]
-    \textcolor{provsafecolor!60}{$\bullet$} Gemma-2-9B (0.62\% ASR-IA)\\[2pt]
-    \textcolor{secondary}{$\bullet$} Phi-3.5-Mini (1.88\% ASR-IA)\\[2pt]
-    \textcolor{nodefcolor}{$\star$} \textbf{PROVSAFE Average} (1.09\% ASR-IA)\\[2pt]
-    \textcolor{nodefcolor!40}{$\blacksquare$} Prior prompt-level defenses
+    \textcolor{nodefcolor}{$\bullet$} No Defense (25.9\% ASR-IA)\\[2pt]
+    \textcolor{patterncolor!80!black}{$\bullet$} Pattern Filter (7.50\% ASR-IA)\\[2pt]
+    \textcolor{policycolor!70!black}{$\bullet$} Policy-Only (1.88\% ASR-IA)\\[2pt]
+    \textcolor{nodefcolor}{$\star$} \textbf{PROVSAFE Avg} (1.09\% ASR-IA)\\[2pt]
+    \textcolor{provsafecolor}{$\bullet$} Per-model \sys{} results
 };
 
 \end{tikzpicture}

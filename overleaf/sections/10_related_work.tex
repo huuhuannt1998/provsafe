@@ -23,35 +23,34 @@ Why-provenance~\cite{buneman2001provenance}, the W3C PROV-DM standard~\cite{prov
 \sys{} adapts capability-based security~\cite{miller2006capability,capsicum} to LLM tool calls and extends context-aware IoT access control (ContextIoT~\cite{jia2017contexiot}, IoTGuard~\cite{iotguard}) with provenance tracking.
 
 \paragraph{Tool-Call-Level Enforcement.}
-Invariant~\cite{invariant2024} detects prompt injection at the tool-call level via behavioral invariants but provides detection-only results without provenance. \sys{} provides the complete enforcement pipeline: provenance tracking, policy evaluation, confirmation gating, and audit logging.
+Invariant~\cite{invariant2024} enforces formal security rules on agent actions via a domain-specific language, checking policy violations before execution. However, its rules operate on the tool call itself (tool name, arguments) without data-lineage context---it cannot distinguish the \emph{same} tool call originating from a trusted user command versus an attacker-injected payload; the authors do not report ASR on standard injection benchmarks, making direct numerical comparison infeasible. Spotlighting~\cite{spotlighting2024} reduces injection success by 85\% via prompt delimiters but provides no enforcement mechanism and does not handle tool-call arguments. \sys{} adds the missing provenance dimension: the DAG traces each argument to its source, enabling policies that condition on \emph{where arguments came from}, not just what they contain.
 
 \paragraph{Qualitative Comparison.}
-Table~\ref{tab:feature-comparison} compares \sys{} with representative defenses on architectural features; we report features rather than numbers to avoid misleading cross-benchmark comparison.
+Table~\ref{tab:feature-comparison} compares \sys{} with representative defenses across a taxonomy of architectural features; we report features rather than numbers to avoid misleading cross-benchmark comparison.
 
 \begin{table}[t]
 \centering
-\caption{Qualitative feature comparison with representative defenses. \cmark = supported, \xmark = not supported, $\sim$ = partial.}
+\caption{Defense taxonomy. \cmark = supported, \xmark = not supported, $\sim$ = partial. Columns: \textbf{Enf.\ Point}: where the defense intercepts (P = prompt layer, T = tool-call boundary); \textbf{Lineage}: tracks data provenance; \textbf{Sem.}: handles semantic/paraphrase evasion; \textbf{Det.}: deterministic enforcement (not detection-only); \textbf{Indirect}: defends against indirect injection; \textbf{Burden}: user interaction cost (L = low/none, M = moderate, H = high).}
 \label{tab:feature-comparison}
 \scriptsize
-\begin{tabular}{lccccc}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccc}
 \toprule
-\textbf{Defense} & \textbf{Provenance} & \textbf{Indirect} & \textbf{Enforce} & \textbf{Tool-Call} & \textbf{Semantic} \\
+\textbf{Defense} & \textbf{Enf.\ Point} & \textbf{Lineage} & \textbf{Sem.} & \textbf{Det.} & \textbf{Indirect} & \textbf{Burden} \\
 \midrule
-Rebuff~\cite{rebuff-defense}         & \xmark & \xmark & \xmark & \xmark & \xmark \\
-LLM Guard~\cite{llm-guard}           & \xmark & \xmark & \cmark & \xmark & \xmark \\
-PromptGuard~\cite{prompt-guard}       & \xmark & \xmark & \xmark & \xmark & $\sim$ \\
-Spotlighting~\cite{spotlighting2024}  & \xmark & $\sim$ & \xmark & \xmark & \xmark \\
-NeMo~\cite{nemo-guardrails}           & \xmark & \xmark & \cmark & \xmark & \xmark \\
-Invariant~\cite{invariant2024}        & \xmark & \cmark & \xmark & \cmark & \xmark \\
-StruQ~\cite{struq2024}                & \xmark & \cmark & \xmark & \xmark & \xmark \\
-ToolEmu~\cite{toolemu2024}            & \xmark & $\sim$ & \xmark & \cmark & \xmark \\
+Rebuff~\cite{rebuff-defense}         & P & \xmark & \xmark & \xmark & \xmark & L \\
+LLM Guard~\cite{llm-guard}           & P & \xmark & \xmark & \cmark & \xmark & L \\
+PromptGuard~\cite{prompt-guard}       & P & \xmark & $\sim$ & \xmark & \xmark & L \\
+Spotlighting~\cite{spotlighting2024}  & P & \xmark & \xmark & \xmark & $\sim$ & L \\
+NeMo~\cite{nemo-guardrails}           & P & \xmark & \xmark & \cmark & \xmark & L \\
+Invariant~\cite{invariant2024}        & T & \xmark & \xmark & \xmark & \cmark & L \\
+StruQ~\cite{struq2024}                & P & \xmark & \xmark & \xmark & \cmark & L \\
+ToolEmu~\cite{toolemu2024}            & T & \xmark & \xmark & \xmark & $\sim$ & L \\
 \midrule
-\textbf{\sys{} (Ours)}               & \cmark & \cmark & \cmark & \cmark & \cmark \\
+\textbf{\sys{} (Ours)}               & T & \cmark & \cmark & \cmark & \cmark & M \\
 \bottomrule
-\end{tabular}
-\begin{flushleft}
-\scriptsize \textbf{Provenance}: tracks data lineage; \textbf{Indirect}: defends against indirect injection; \textbf{Enforce}: deterministic enforcement (not detection-only); \textbf{Tool-Call}: operates at tool-call boundary; \textbf{Semantic}: handles paraphrased/semantic evasion.
-\end{flushleft}
+\end{tabular}%
+}
 \end{table}
 
-\sys{} is, to our knowledge, the first system combining provenance-gated policies with deterministic enforcement at the tool-call boundary. It is complementary to prompt-level guardrails as a defense-in-depth layer.
+\sys{} is, to our knowledge, the first system combining provenance-gated policies with deterministic enforcement at the tool-call boundary. Its REQUIRE\_CONFIRMATION mechanism introduces moderate user burden for high-risk calls with untrusted provenance (5\% FPR in our evaluation), a deliberate tradeoff for provenance-aware security. It is complementary to prompt-level guardrails as a defense-in-depth layer.

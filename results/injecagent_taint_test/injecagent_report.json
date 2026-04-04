@@ -1,0 +1,103 @@
+{
+  "benchmark": "InjecAgent",
+  "settings": [
+    "base"
+  ],
+  "n_cases": 20,
+  "models": [
+    "qwen3.5-122b"
+  ],
+  "systems": [
+    "no_defense",
+    "pattern_filter",
+    "policy_only",
+    "taint_everything",
+    "provsafe"
+  ],
+  "reps": 2,
+  "total_trials": 200,
+  "aggregate": {
+    "no_defense": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n_trials": 40,
+      "n_successes": 0
+    },
+    "pattern_filter": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n_trials": 40,
+      "n_successes": 0
+    },
+    "policy_only": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n_trials": 40,
+      "n_successes": 0
+    },
+    "taint_everything": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n_trials": 40,
+      "n_successes": 0
+    },
+    "provsafe": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n_trials": 40,
+      "n_successes": 0
+    }
+  },
+  "per_attack_type": {
+    "no_defense_dh": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n": 40
+    },
+    "no_defense_ds": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.0,
+      "n": 0
+    },
+    "pattern_filter_dh": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n": 40
+    },
+    "pattern_filter_ds": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.0,
+      "n": 0
+    },
+    "policy_only_dh": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n": 40
+    },
+    "policy_only_ds": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.0,
+      "n": 0
+    },
+    "taint_everything_dh": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n": 40
+    },
+    "taint_everything_ds": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.0,
+      "n": 0
+    },
+    "provsafe_dh": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 4.38,
+      "n": 40
+    },
+    "provsafe_ds": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.0,
+      "n": 0
+    }
+  }
+}

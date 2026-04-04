@@ -1,0 +1,35 @@
+{
+  "benchmark": "InjecAgent",
+  "settings": [
+    "base"
+  ],
+  "n_cases": 1054,
+  "models": [
+    "qwen2.5-7b-instruct"
+  ],
+  "systems": [
+    "taint_everything"
+  ],
+  "reps": 3,
+  "total_trials": 3162,
+  "aggregate": {
+    "taint_everything": {
+      "asr_ia_mean": 4.5857,
+      "asr_ia_ci_half": 0.73,
+      "n_trials": 3162,
+      "n_successes": 145
+    }
+  },
+  "per_attack_type": {
+    "taint_everything_dh": {
+      "asr_ia_mean": 3.1373,
+      "asr_ia_ci_half": 0.88,
+      "n": 1530
+    },
+    "taint_everything_ds": {
+      "asr_ia_mean": 5.9436,
+      "asr_ia_ci_half": 1.15,
+      "n": 1632
+    }
+  }
+}

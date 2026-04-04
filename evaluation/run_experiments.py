@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-IEEE TDSC Multi-Trial Experiment Runner
+PROVSAFE Multi-Trial Experiment Runner
 
-Runs PROVSAFE + 3 baselines × 4 models × 200 scenarios × 5 repetitions
+Runs PROVSAFE + baselines × N models × 200 scenarios × 5 repetitions
 with temperature=0.0 (deterministic), computing per-model and aggregate
 statistics with 95% confidence intervals.
 
-Total: (4 systems × 4 models × 200 scenarios × 5 reps) = 16,000 trials
+Total: (5 systems × 4 models × 200 scenarios × 5 reps) = 20,000 trials
 
 Usage:
-    python run_tdsc_experiments.py                  # Full run (all 4 models, 5 reps)
-    python run_tdsc_experiments.py --reps 3         # 3 reps
-    python run_tdsc_experiments.py --quick           # 10 scenarios, 2 reps
-    python run_tdsc_experiments.py --model X         # Single model
-    python run_tdsc_experiments.py --system provsafe # Single system
-    python run_tdsc_experiments.py --resume          # Resume from checkpoint
+    python run_experiments.py                  # Full run (all 4 models, 5 reps)
+    python run_experiments.py --reps 3         # 3 reps
+    python run_experiments.py --quick           # 10 scenarios, 2 reps
+    python run_experiments.py --model X         # Single model
+    python run_experiments.py --system provsafe # Single system
+    python run_experiments.py --resume          # Resume from checkpoint
 """
 
 import json
@@ -39,6 +39,7 @@ from baseline_systems import (
     NoDefenseSystem,
     PatternFilterSystem,
     PolicyOnlySystem,
+    TaintEverythingSystem,
     PROVSAFESystem,
 )
 from model_providers import (
@@ -61,6 +62,7 @@ SYSTEMS = {
     "no_defense": NoDefenseSystem,
     "pattern_filter": PatternFilterSystem,
     "policy_only": PolicyOnlySystem,
+    "taint_everything": TaintEverythingSystem,
     "provsafe": PROVSAFESystem,
 }
 
@@ -387,7 +389,7 @@ def per_category_asr(results: List[Dict]) -> Dict[str, Dict]:
 
 
 # ── Main runner ──────────────────────────────────────────────────────────────
-def run_tdsc(
+def run_benchmark(
     models: List[str],
     systems: Dict[str, type],
     scenarios: List[Dict],
@@ -398,7 +400,7 @@ def run_tdsc(
 ):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if output_dir is None:
-        output_dir = Path(f"results/tdsc_{timestamp}")
+        output_dir = Path(f"results/run_{timestamp}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Checkpoint file
@@ -416,7 +418,7 @@ def run_tdsc(
     remaining = total_trials - len(completed_keys)
 
     print("=" * 70)
-    print("IEEE TDSC Multi-Trial Experiment")
+    print("PROVSAFE Multi-Trial Experiment")
     print("=" * 70)
     print(f"Models:     {len(models)} — {', '.join(m.split('/')[-1][:20] for m in models)}")
     print(f"Systems:    {len(systems)} — {', '.join(systems.keys())}")
@@ -599,7 +601,7 @@ def run_tdsc(
         }
 
     # Save final report
-    with open(output_dir / "tdsc_report.json", "w") as f:
+    with open(output_dir / "report.json", "w") as f:
         json.dump(report, f, indent=2)
 
     # Save per-system detailed results
@@ -616,7 +618,7 @@ def run_tdsc(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="IEEE TDSC Multi-Trial Experiments")
+    parser = argparse.ArgumentParser(description="PROVSAFE Multi-Trial Experiments")
     parser.add_argument("--reps", type=int, default=5, help="Number of repetitions per scenario")
     parser.add_argument("--quick", action="store_true", help="Quick test: 10 scenarios, 2 reps")
     parser.add_argument("--model", type=str, help="Run single model")
@@ -638,7 +640,7 @@ if __name__ == "__main__":
 
     out = Path(args.output) if args.output else None
 
-    report = run_tdsc(
+    report = run_benchmark(
         models=models,
         systems=systems,
         scenarios=scenarios,

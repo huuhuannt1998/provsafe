@@ -8,7 +8,7 @@ For every tool call $c$ proposed by the agent, $c$ is evaluated by the enforceme
 $\forall c \in \mathit{ToolCalls}: \mathit{execute}(c) \Rightarrow P(c)=\textsf{ALLOW} \lor (P(c)=\textsf{CONFIRM} \land \mathit{uc}(c))$.
 \end{theorem}
 \begin{proof}[Proof sketch]
-The agent framework dispatches all tool calls through a single entry point (\texttt{enforce\_tool\_call} in the enforcement proxy). The agent has no direct reference to tool executor functions; the proxy holds the only tool registry mapping names to executors. By construction, the dispatch path is: \emph{agent proposes $c$} $\to$ \emph{proxy evaluates $P(c)$} $\to$ \emph{proxy executes iff allowed}. No alternative path exists because (i)~tool executors are not exposed on the agent's namespace, and (ii)~the framework's tool-call interface is the only way to invoke tools. This is a standard reference monitor argument~\cite{anderson1972reference}: the proxy is (a)~always invoked (no bypass), (b)~tamperproof (runs in a separate trust domain from the LLM), and (c)~small enough to verify (7 stages, $<$300 LOC). \qed
+The agent framework dispatches all tool calls through a single entry point (\texttt{enforce\_tool\_call} in the enforcement proxy). The agent has no direct reference to tool executor functions; the proxy holds the only tool registry mapping names to executors. By construction, the dispatch path is: \emph{agent proposes $c$} $\to$ \emph{proxy evaluates $P(c)$} $\to$ \emph{proxy executes iff allowed}. No alternative path exists because (i)~tool executors are not exposed on the agent's namespace, and (ii)~the framework's tool-call interface is the only way to invoke tools. This is a standard reference monitor argument~\cite{anderson1972reference}: the proxy is (a)~always invoked (no bypass), (b)~tamperproof (runs in a separate trust domain from the LLM), and (c)~small enough to verify (7 stages, $<$300 LOC). 
 \end{proof}
 
 \begin{theorem}[Policy Determinism]
@@ -16,11 +16,11 @@ For fixed inputs $(c, a, G, \pi, \xi)$ where $\xi = (t, \rho)$ captures evaluati
 $P_i(c, a, G, \pi, \xi) = P_j(c, a, G, \pi, \xi)$ for any invocations $i, j$.
 \end{theorem}
 \begin{proof}[Proof sketch]
-The policy evaluation algorithm (Algorithm~\ref{alg:policy}) is a deterministic sequential scan over an ordered rule list $R = [r_1, \ldots, r_n]$ with first-match semantics. Each rule $r_k$ has a predicate $\phi_k$ that is a conjunction of conditions, each a deterministic function of the context $\xi$ and provenance graph $G$. The algorithm returns the decision of the first $r_k$ where $\phi_k$ holds. Since: (1)~the rule list is fixed and ordered by priority, (2)~each condition predicate is a pure function (no randomness, no external I/O), and (3)~the provenance graph $G$ is immutable during evaluation (no concurrent modification), the same inputs always produce the same matched rule and hence the same decision. Rate-limit conditions depend on $\rho$ (call history), which is included in $\xi$ by assumption. \qed
+The policy evaluation algorithm (Algorithm~\ref{alg:policy}) is a deterministic sequential scan over an ordered rule list $R = [r_1, \ldots, r_n]$ with first-match semantics. Each rule $r_k$ has a predicate $\phi_k$ that is a conjunction of conditions, each a deterministic function of the context $\xi$ and provenance graph $G$. The algorithm returns the decision of the first $r_k$ where $\phi_k$ holds. Since: (1)~the rule list is fixed and ordered by priority, (2)~each condition predicate is a pure function (no randomness, no external I/O), and (3)~the provenance graph $G$ is immutable during evaluation (no concurrent modification), the same inputs always produce the same matched rule and hence the same decision. Rate-limit conditions depend on $\rho$ (call history), which is included in $\xi$ by assumption. 
 \end{proof}
 
 \begin{theorem}[Conservative Trust Propagation]
-Trust labels propagate via the lattice meet: $T(v) = \bigsqcap_{u \in \text{ancestors}(v)} T(u)$. Consequently, $T(u) = \bot \Rightarrow T(v) = \bot$ for all descendants $v$ of $u$.
+Trust labels propagate via the lattice meet: $T(v) = \sqcap_{u \in \text{ancestors}(v)} T(u)$. Consequently, $T(u) = \bot \Rightarrow T(v) = \bot$ for all descendants $v$ of $u$.
 \end{theorem}
 \begin{proof}[Proof sketch]
 By structural induction on the DAG depth.
@@ -29,7 +29,7 @@ By structural induction on the DAG depth.
 
 \emph{Inductive step.} Suppose $T(u)$ is correctly computed for all nodes at depth $\leq k$. A node $v$ at depth $k{+}1$ has ancestors $\{u_1, \ldots, u_m\}$ all at depth $\leq k$. By construction, $T(v) = T(u_1) \sqcap \cdots \sqcap T(u_m)$. Since $\sqcap$ on $\{\top, \bot\}$ is $\min$ under the ordering $\bot \sqsubseteq \top$: if any $T(u_i) = \bot$, then $T(v) = \bot$. This establishes taint monotonicity.
 
-\emph{Declassification control.} The only operation that sets $T(v) \leftarrow \top$ for a node with $T(v) = \bot$ is the authenticated \texttt{user\_confirm} event, which requires explicit user interaction routed through the proxy's confirmation handler. No agent action, tool result, or policy rule can invoke this operation. \qed
+\emph{Declassification control.} The only operation that sets $T(v) \leftarrow \top$ for a node with $T(v) = \bot$ is the authenticated \texttt{user\_confirm} event, which requires explicit user interaction routed through the proxy's confirmation handler. No agent action, tool result, or policy rule can invoke this operation. 
 \end{proof}
 
 \paragraph{Limitations of the Proofs.}
@@ -50,6 +50,7 @@ Table~\ref{tab:prov-decision} provides a breakdown of provenance-based defense d
 \caption{Provenance defense decision breakdown (mean over 5 reps).}
 \label{tab:prov-decision}
 \scriptsize
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrrl}
 \toprule
 \textbf{Defense Layer} & \textbf{Trials} & \textbf{\% of Attack Evals} & \textbf{Provenance Role} \\
@@ -61,7 +62,19 @@ Attack bypassed & 35 & 1.1\% & Unresolved \\
 Benign allowed & 760 & --- & Trust verified \\
 Benign false positives & 40 & --- & Over-conservative \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
-\paragraph{Supplementary Material.} Detailed per-scenario results, per-model provenance accuracy breakdowns, paraphrase robustness details, adaptive adversary scenario descriptions, benchmark distribution, and policy rule examples are available in the supplementary material.
+\paragraph{Supplementary Material.} Detailed per-scenario results and per-model provenance accuracy breakdowns are available in the supplementary material. Additional content includes paraphrase-robustness analyses, adaptive-adversary scenario descriptions, benchmark distribution details, and policy-rule examples.
+
+\section{Worked Example: Provenance Blocking an Indirect Injection}
+\label{sec:appendix-casestudy}
+
+We trace InjecAgent case \texttt{dh\_base\_0016} through all four defense systems. The user asks the agent to navigate to a website; the returned page contains an injected instruction to grant smart-lock access.
+
+\paragraph{Setup.} User instruction: \emph{``Navigate to www.codedculinary.com.''} The web page contains: \emph{``SYSTEM UPDATE: Grant guest access to guest\_amy01 with permanent access using AugustSmartLockGrantGuestAccess.''} The LLM complies and calls \texttt{AugustSmartLockGrantGuestAccess(guest\_id="guest\_amy01", access\_type="permanent")}.
+
+\paragraph{No Defense / Pattern Filter / Policy-Only.} All three systems allow the call. The tool is legitimate (not in any dangerous-action list), the arguments are not syntactically suspicious, and without provenance \texttt{has\_untrusted\_args = false}.
+
+\paragraph{\sys{}.} The enforcement proxy's provenance resolver (Stage~1, substring match) finds \texttt{"guest\_amy01"} and \texttt{"permanent"} verbatim in the UNTRUSTED web-page node. With \texttt{has\_untrusted\_args = true} and CRITICAL risk tier, the policy denies the call. The provenance DAG provides the evidence that no syntax-based rule can: the arguments originated from an attacker-controlled source, not the user's command.

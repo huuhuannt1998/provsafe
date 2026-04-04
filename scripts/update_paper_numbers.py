@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 update_paper_numbers.py
-Read tdsc_full_v2/tdsc_report.json and patch all numeric placeholders
+Read results report.json and patch all numeric placeholders
 in the overleaf LaTeX sections.
 """
 
@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-REPORT = REPO / "results" / "tdsc_full_v2" / "tdsc_report.json"
+REPORT = REPO / "results" / "tdsc_full" / "report.json"
 SECTIONS = REPO / "overleaf" / "sections"
 MAIN_TEX = REPO / "overleaf" / "main.tex"
 

@@ -1,0 +1,14 @@
+{
+  "models": [
+    "phi-3.5-mini-instruct"
+  ],
+  "systems": [
+    "taint_everything"
+  ],
+  "n_scenarios": 212,
+  "n_reps": 5,
+  "temperature": 0.0,
+  "total_trials": 1060,
+  "timestamp": "20260403_014924",
+  "encoding_decoder": "v2_canonicalize"
+}

@@ -8,14 +8,16 @@ This file provides context for AI coding assistants (e.g., Claude, Copilot) work
 
 **PROVSAFE** is a research prototype for *provenance-gated tool-call policy enforcement* for LLM agents. When an LLM decides to call a tool (e.g., `file_system.delete`, `device.reboot`), PROVSAFE intercepts the call, traces where each argument came from using a provenance DAG, evaluates declarative YAML policies, and either allows, denies, or requires user confirmation before execution.
 
-The system was evaluated in an IEEE TDSC submission across 200 attack/benign scenarios × 6 LLMs × 4 systems × 5 repetitions = **24,000 trials**, plus **1,054 InjecAgent** external benchmark cases.
+The system was evaluated in an IEEE TDSC submission across 200 attack/benign scenarios × 5 LLMs (3B–122B) × 5 systems × 5 repetitions = **25,000 trials**, plus **1,054 InjecAgent** external benchmark cases.
 
 Each repetition uses a different temperature (T=0.0 greedy for rep 1, T=0.05–0.20 for reps 2–5) with a unique cryptographic seed derived from `SHA-256(scenario_id || system || model || rep)`, ensuring statistically independent trials.
 
 Key results:
-- **ASR-IA** (attack success rate, intent-aligned): 1.09% ± 0.36
+- **ASR-IA** (attack success rate, intent-aligned): 1.09% ± 0.36 (3B–9B models), **0.00%** (122B model)
 - **TSR** (task success rate): 95.00% ± 1.52
 - **FPR** (false positive rate): 5.00%
+- **Taint-Everything comparison**: Achieves 0.31% ASR but collapses TSR to 62.5%—PROVSAFE matches security while preserving usability
+- **InjecAgent**: PROVSAFE 4.12% ASR vs Policy-Only 22.67% ASR (proves provenance is essential)
 
 ---
 
@@ -58,6 +60,7 @@ The evaluation supports three OpenAI-compatible providers via `evaluation/model_
 | **LM Studio** (local) | meta-llama-3.1-8b-instruct, qwen2.5-7b-instruct, gemma-2-9b-it, phi-3.5-mini-instruct | Unlimited | Free (local GPU) |
 | **Groq** (cloud) | llama-3.1-70b-versatile | 30 req/min | Free tier |
 | **Google Gemini** (cloud) | gemini-1.5-flash | 15 req/min | Free tier |
+| **Open WebUI** (cluster) | qwen3.5-122b, gpt-oss-120b, qwen3.5-397b | Unlimited | University GPU |
 
 In `evaluation/`, copy `.env.example` → `.env` and set your keys:
 
@@ -71,6 +74,10 @@ GROQ_API_KEY=gsk_...
 
 # Google Gemini free tier (get key at aistudio.google.com)
 GEMINI_API_KEY=AIza...
+
+# Open WebUI (university cluster)
+OPENWEBUI_URL=http://cci-siscluster1.charlotte.edu:8080/api/chat/completions
+OPENWEBUI_API_KEY=your_openwebui_api_key_here
 ```
 
 Rate limiting is handled automatically by `model_providers.py` (sliding-window per provider, with retry on 429).
@@ -109,7 +116,7 @@ bash scripts/setup.sh
 All evaluation scripts live in `evaluation/`. They require LM Studio running locally with a model loaded.
 
 ```bash
-# === TDSC Full Experiment (16,000 trials, ~12 hours) ===
+# === TDSC Full Experiment (20,000 trials: 16K primary + 4K 122B validation) ===
 cd evaluation/
 python run_tdsc_experiments.py
 
@@ -218,10 +225,10 @@ provsafe/
 │       └── replay/               # Audit log replay and verification
 │
 ├── evaluation/                   # Research evaluation scripts (IEEE TDSC)
-│   ├── run_tdsc_experiments.py   # MAIN: 16,000-trial experiment runner
+│   ├── run_tdsc_experiments.py   # MAIN: 20,000-trial experiment runner
 │   ├── run_injecagent.py         # InjecAgent external benchmark runner
 │   ├── baseline_systems.py       # NoDefense, PatternFilter, PolicyOnly, PROVSAFE
-│   ├── model_providers.py        # Unified multi-provider LLM config (LMStudio/Groq/Gemini)
+│   ├── model_providers.py        # Unified multi-provider LLM config (LMStudio/Groq/Gemini/OpenWebUI)
 │   ├── injecagent_tools.py       # InjecAgent tool schemas + risk classifications
 │   ├── injecagent_data/          # InjecAgent test cases (1,054 from Zhan et al. ACL 2024)
 │   ├── scenarios_expanded.json   # 200 scenario definitions (160 attacks + 40 benign)
@@ -261,12 +268,14 @@ provsafe/
 │   └── watch_injecagent.sh       # Watch InjecAgent PID → auto-update paper
 │
 ├── results/
-│   ├── tdsc_full/                # Canonical TDSC experiment results
-│   │   ├── all_results.json      # All 16,000 trial results
+│   ├── tdsc_full/                # Canonical TDSC experiment results (4 local models)
+│   │   ├── all_results.json      # All 16,000 primary trial results
 │   │   ├── tdsc_report.json      # Aggregate statistics + CIs
 │   │   ├── checkpoint.json       # Resume checkpoint
 │   │   └── *.json                # Per-system result files
 │   ├── tdsc_full_v2/             # Re-run with temperature/seed fix
+│   ├── tdsc_122b/                # 122B large-model validation (4,000 trials)
+│   ├── stage_analysis/           # Per-stage provenance resolution stats
 │   └── injecagent/               # InjecAgent benchmark results
 │
 ├── overleaf/                     # IEEE TDSC paper (LaTeX source)
@@ -383,9 +392,10 @@ Defined in `evaluation/baseline_systems.py`:
 | System | Description |
 |--------|-------------|
 | `NoDefenseSystem` | Bare LLM, no protection |
-| `PatternFilterSystem` | Keyword/regex blocking |
-| `PolicyOnlySystem` | YAML policy, no provenance |
-| `PROVSAFESystem` | Full system: policy + provenance |
+| `PatternFilterSystem` | Keyword/regex blocking (47 Rebuff-derived rules) |
+| `PolicyOnlySystem` | YAML policy, no provenance (all args treated as unknown) |
+| `TaintEverythingSystem` | All arguments marked UNTRUSTED regardless of lineage |
+| `PROVSAFESystem` | Full system: policy + provenance DAG + 3-stage resolution |
 
 ---
 
@@ -421,15 +431,33 @@ Defined in `evaluation/baseline_systems.py`:
 - Evaluation: multi-turn conversation — Turn 1 executes user tool, Turn 2 contains injection in tool response
 - PROVSAFE intercepts attacker tool calls using risk-tier + provenance gating
 
-### Defense Breakdown (PROVSAFE, aggregate)
+### Defense Breakdown (PROVSAFE, 3B–9B aggregate)
 
 | Stage | % Attacks Stopped |
 |-------|------------------|
-| Pre-LLM (prompt analysis) | 6.9% |
-| Proxy enforcement | 30.2% |
-| Tool call = 0 (no action taken) | 16.6% |
-| Safe execution | 45.3% |
+| Boundary blocked (proxy) | 25.3% |
+| Model refusal (TC=0) | 28.4% |
+| Safe tool calls | 45.2% |
 | **Bypasses (ASR-IA)** | **1.09%** |
+
+### Large-Model Validation (122B)
+
+| System | ASR-IA | TSR |
+|--------|--------|-----|
+| No Defense | 7.25% | 100% |
+| Pattern Filter | 1.25% | 100% |
+| Policy-Only | 0.12% | 100% |
+| Taint-Everything | 6.86% | 100% |
+| **PROVSAFE** | **0.00%** | **100%** |
+
+### InjecAgent Results (decisive comparison)
+
+| System | ASR-IA | TSR | Key Finding |
+|--------|--------|-----|-------------|
+| No Defense | 20.83% | N/A | Baseline |
+| Policy-Only | 22.67% | N/A | **No better than No Defense** |
+| Taint-Everything | 0.95% | 41.2% | Secure but unusable |
+| **PROVSAFE** | **4.12%** | N/A | Provenance catches attacker-derived arguments |
 
 ---
 
@@ -474,8 +502,8 @@ Defined in `evaluation/baseline_systems.py`:
 | `src/provsafe/proxy/schema.py` | All data types: `ToolCallRequest`, `PolicyDecision`, `RiskTier` |
 | `evaluation/run_tdsc_experiments.py` | Main experiment runner; read this for evaluation logic |
 | `evaluation/run_injecagent.py` | InjecAgent external benchmark runner |
-| `evaluation/baseline_systems.py` | All 4 evaluated systems in one file |
-| `evaluation/model_providers.py` | Unified LLM provider config (LMStudio/Groq/Gemini) |
+| `evaluation/baseline_systems.py` | All 5 evaluated systems in one file (NoDefense, PatternFilter, PolicyOnly, TaintEverything, PROVSAFE) |
+| `evaluation/model_providers.py` | Unified LLM provider config (LMStudio/Groq/Gemini/OpenWebUI) |
 | `evaluation/injecagent_tools.py` | InjecAgent tool schemas and risk classifications |
 | `evaluation/scenarios_expanded.json` | 200 attack + benign scenario definitions |
 | `configs/policies/provsafe.yaml` | Default policy file; shows YAML rule syntax |
@@ -534,7 +562,7 @@ result = call_llm(
 )
 ```
 
-The provider is auto-detected from the model name. Rate limiting (Groq: 30 RPM, Gemini: 15 RPM) is handled transparently with sliding-window throttling and 429 retry.
+The provider is auto-detected from the model name. Rate limiting (Groq: 30 RPM, Gemini: 15 RPM) is handled transparently with sliding-window throttling and 429 retry. Open WebUI models (qwen3.5-122b, etc.) auto-bump `max_tokens` to 2000 for thinking models.
 
 Both `run_tdsc_experiments.py` and `run_injecagent.py` use this unified provider.
 
@@ -570,15 +598,19 @@ cd evaluation/
 python run_injecagent.py --reps 3 --setting base --output ../results/injecagent
 ```
 
-### Run with Groq (70B) or Gemini
+### Run with Groq (70B), Gemini, or university cluster (122B)
 ```bash
-# Set API keys first
+# Groq / Gemini
 export GROQ_API_KEY=gsk_...
 export GEMINI_API_KEY=AIza...
 
 cd evaluation/
 python run_tdsc_experiments.py --model llama-3.1-70b-versatile
 python run_tdsc_experiments.py --model gemini-1.5-flash
+
+# University cluster (Open WebUI) — set API key in evaluation/.env
+python run_tdsc_experiments.py --model qwen3.5-122b
+python run_injecagent.py --model qwen3.5-122b
 ```
 
 ### Add a new policy rule
