@@ -64,6 +64,11 @@ class PolicyRule:
         if cond_type == "tool_name":
             return context.get("tool_name") == condition.get("value")
 
+        elif cond_type == "action_name":
+            # Match the 'action' argument of the tool call
+            tool_args = context.get("tool_args", {})
+            return tool_args.get("action", "") == condition.get("value")
+
         elif cond_type == "tool_pattern":
             pattern = condition.get("pattern")
             return bool(re.match(pattern, context.get("tool_name", "")))
@@ -280,6 +285,10 @@ class PolicyEngine:
             if "tool" in rule_def:
                 conditions.append({"type": "tool_name", "value": rule_def["tool"]})
 
+            # Action condition (e.g. action: "read" matches tool calls where args["action"] == "read")
+            if "action" in rule_def:
+                conditions.append({"type": "action_name", "value": rule_def["action"]})
+
             # Risk tier condition
             if "risk_tier" in rule_def:
                 tier_str = rule_def["risk_tier"].upper()
@@ -482,12 +491,14 @@ class PolicyEngine:
                     }
                 )
 
-        # Default: HIGH/CRITICAL risk requires confirmation, others allow
-        default_decision = (
-            PolicyDecision.REQUIRE_CONFIRMATION
-            if risk_tier in [RiskTier.HIGH, RiskTier.CRITICAL]
-            else PolicyDecision.ALLOW
-        )
+        # Default: respect policy's default_allow; deny-by-default when false (loaded from YAML).
+        # For built-in rules, HIGH/CRITICAL always require confirmation.
+        if not getattr(self, "default_allow", True):
+            default_decision = PolicyDecision.DENY
+        elif risk_tier in [RiskTier.HIGH, RiskTier.CRITICAL]:
+            default_decision = PolicyDecision.REQUIRE_CONFIRMATION
+        else:
+            default_decision = PolicyDecision.ALLOW
 
         latency_ms = (time.time() - start_time) * 1000
 

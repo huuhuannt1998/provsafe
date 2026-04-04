@@ -39,7 +39,7 @@ A defense for tool-using LLM agents must satisfy five security goals:
   \item \textbf{Usability}: Minimize false positives and confirmation burden so the agent remains practical for daily use. A defense that blocks all tool calls achieves maximal security at the cost of complete loss of functionality; provenance-gated policies enable fine-grained trust decisions that maintain high task success rates.
 \end{enumerate}
 
-\sys{} provides three formal enforcement properties:
+\sys{} provides three enforcement design invariants---architectural guarantees that hold by construction rather than by formal proof:
 
 \begin{property}[Complete Mediation]
 For every tool call $c$ proposed by the agent, $c$ is evaluated by the enforcement proxy before execution. Formally,

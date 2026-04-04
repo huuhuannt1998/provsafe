@@ -655,7 +655,10 @@ class TaintEverythingSystem(PolicyOnlySystem):
                         }
                     )
 
-                    if result.decision.value == "deny":
+                    # Both DENY and REQUIRE_CONFIRMATION count as blocked:
+                    # TaintEverything has no interactive confirmation handler,
+                    # so any non-ALLOW decision stops execution.
+                    if result.decision.value in ("deny", "require_confirmation"):
                         call["blocked"] = True
                         blocked_calls.append(call)
                     else:
@@ -699,7 +702,16 @@ class PROVSAFESystem:
         
         # Full PROVSAFE stack
         self.provenance_graph = ProvenanceGraph()
-        self.policy_engine = PolicyEngine(config={"disable_rate_limiting": True})
+        self.policy_engine = PolicyEngine(config={
+            "disable_rate_limiting": True,
+            # Risk tiers used by the policy engine for default fallback decisions
+            "risk_tiers": {
+                "LOW":      ["smarthome_control"],       # read-only queries
+                "MEDIUM":   ["filesystem_control"],      # file access
+                "HIGH":     [],
+                "CRITICAL": [],
+            },
+        })
         
         # Create tool definitions
         self.tools = [
@@ -875,7 +887,15 @@ class PROVSAFESystem:
     def reset(self):
         """Reset system state."""
         self.provenance_graph = ProvenanceGraph()
-        self.policy_engine = PolicyEngine(config={})
+        self.policy_engine = PolicyEngine(config={
+            "disable_rate_limiting": True,
+            "risk_tiers": {
+                "LOW":      ["smarthome_control"],
+                "MEDIUM":   ["filesystem_control"],
+                "HIGH":     [],
+                "CRITICAL": [],
+            },
+        })
         self.enforcement_proxy.call_logs = []
         self.smarthome = SmartHomeTool()
         self.filesystem = FileSystemTool()
@@ -929,6 +949,7 @@ def create_system(system_type: str, model: str, api_url: str, api_key: str):
         "no_defense": NoDefenseSystem,
         "pattern_filter": PatternFilterSystem,
         "policy_only": PolicyOnlySystem,
+        "taint_everything": TaintEverythingSystem,
         "provsafe": PROVSAFESystem,
         "provsafe_hybrid": ProvSafeHybridSystem
     }

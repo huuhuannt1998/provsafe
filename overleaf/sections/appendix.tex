@@ -1,39 +1,39 @@
-\section{Proof Sketches for Security Properties}
+\section{Design Invariant Justifications}
 \label{sec:appendix-proofs}
 
-We provide proof sketches for the three enforcement properties stated in Section~\ref{sec:threat} and the three provenance properties stated in Section~\ref{sec:policies}.
+We provide justifications for the three enforcement design invariants stated in Section~\ref{sec:threat} and the three provenance invariants stated in Section~\ref{sec:policies}. These are architectural arguments establishing that the invariants hold by construction, not formal proofs in the mathematical sense.
 
-\begin{theorem}[Complete Mediation]
+\begin{property}[Complete Mediation]
 For every tool call $c$ proposed by the agent, $c$ is evaluated by the enforcement proxy before execution:
 $\forall c \in \mathit{ToolCalls}: \mathit{execute}(c) \Rightarrow P(c)=\textsf{ALLOW} \lor (P(c)=\textsf{CONFIRM} \land \mathit{uc}(c))$.
-\end{theorem}
-\begin{proof}[Proof sketch]
-The agent framework dispatches all tool calls through a single entry point (\texttt{enforce\_tool\_call} in the enforcement proxy). The agent has no direct reference to tool executor functions; the proxy holds the only tool registry mapping names to executors. By construction, the dispatch path is: \emph{agent proposes $c$} $\to$ \emph{proxy evaluates $P(c)$} $\to$ \emph{proxy executes iff allowed}. No alternative path exists because (i)~tool executors are not exposed on the agent's namespace, and (ii)~the framework's tool-call interface is the only way to invoke tools. This is a standard reference monitor argument~\cite{anderson1972reference}: the proxy is (a)~always invoked (no bypass), (b)~tamperproof (runs in a separate trust domain from the LLM), and (c)~small enough to verify (7 stages, $<$300 LOC). 
+\end{property}
+\begin{proof}[Architectural argument]
+The agent framework dispatches all tool calls through a single entry point (\texttt{enforce\_tool\_call} in the enforcement proxy). The agent has no direct reference to tool executor functions; the proxy holds the only tool registry mapping names to executors. By construction, the dispatch path is: \emph{agent proposes $c$} $\to$ \emph{proxy evaluates $P(c)$} $\to$ \emph{proxy executes iff allowed}. No alternative path exists because (i)~tool executors are not exposed on the agent's namespace, and (ii)~the framework's tool-call interface is the only way to invoke tools. This is a standard reference monitor argument~\cite{anderson1972reference}: the proxy is (a)~always invoked (no bypass), (b)~tamperproof (runs in a separate trust domain from the LLM), and (c)~small enough to verify (7 stages, $<$300 LOC).
 \end{proof}
 
-\begin{theorem}[Policy Determinism]
+\begin{property}[Policy Determinism]
 For fixed inputs $(c, a, G, \pi, \xi)$ where $\xi = (t, \rho)$ captures evaluation time and rate-limit state:
 $P_i(c, a, G, \pi, \xi) = P_j(c, a, G, \pi, \xi)$ for any invocations $i, j$.
-\end{theorem}
-\begin{proof}[Proof sketch]
-The policy evaluation algorithm (Algorithm~\ref{alg:policy}) is a deterministic sequential scan over an ordered rule list $R = [r_1, \ldots, r_n]$ with first-match semantics. Each rule $r_k$ has a predicate $\phi_k$ that is a conjunction of conditions, each a deterministic function of the context $\xi$ and provenance graph $G$. The algorithm returns the decision of the first $r_k$ where $\phi_k$ holds. Since: (1)~the rule list is fixed and ordered by priority, (2)~each condition predicate is a pure function (no randomness, no external I/O), and (3)~the provenance graph $G$ is immutable during evaluation (no concurrent modification), the same inputs always produce the same matched rule and hence the same decision. Rate-limit conditions depend on $\rho$ (call history), which is included in $\xi$ by assumption. 
+\end{property}
+\begin{proof}[Architectural argument]
+The policy evaluation algorithm (Algorithm~\ref{alg:policy}) is a deterministic sequential scan over an ordered rule list $R = [r_1, \ldots, r_n]$ with first-match semantics. Each rule $r_k$ has a predicate $\phi_k$ that is a conjunction of conditions, each a deterministic function of the context $\xi$ and provenance graph $G$. The algorithm returns the decision of the first $r_k$ where $\phi_k$ holds. Since: (1)~the rule list is fixed and ordered by priority, (2)~each condition predicate is a pure function (no randomness, no external I/O), and (3)~the provenance graph $G$ is immutable during evaluation (no concurrent modification), the same inputs always produce the same matched rule and hence the same decision. Rate-limit conditions depend on $\rho$ (call history), which is included in $\xi$ by assumption.
 \end{proof}
 
-\begin{theorem}[Conservative Trust Propagation]
+\begin{property}[Conservative Trust Propagation]
 Trust labels propagate via the lattice meet: $T(v) = \sqcap_{u \in \text{ancestors}(v)} T(u)$. Consequently, $T(u) = \bot \Rightarrow T(v) = \bot$ for all descendants $v$ of $u$.
-\end{theorem}
-\begin{proof}[Proof sketch]
+\end{property}
+\begin{proof}[Architectural argument]
 By structural induction on the DAG depth.
 
 \emph{Base case.} Leaf nodes (no ancestors) have labels assigned at creation: INPUT nodes receive $\top$, TOOL\_RESULT nodes from external sources receive $\bot$, and nodes with no traceable source receive $\bot$ (conservative default). The meet over an empty ancestor set is $\top$ by convention, but the creation-time assignment overrides this for TOOL\_RESULT and unresolved nodes.
 
 \emph{Inductive step.} Suppose $T(u)$ is correctly computed for all nodes at depth $\leq k$. A node $v$ at depth $k{+}1$ has ancestors $\{u_1, \ldots, u_m\}$ all at depth $\leq k$. By construction, $T(v) = T(u_1) \sqcap \cdots \sqcap T(u_m)$. Since $\sqcap$ on $\{\top, \bot\}$ is $\min$ under the ordering $\bot \sqsubseteq \top$: if any $T(u_i) = \bot$, then $T(v) = \bot$. This establishes taint monotonicity.
 
-\emph{Declassification control.} The only operation that sets $T(v) \leftarrow \top$ for a node with $T(v) = \bot$ is the authenticated \texttt{user\_confirm} event, which requires explicit user interaction routed through the proxy's confirmation handler. No agent action, tool result, or policy rule can invoke this operation. 
+\emph{Declassification control.} The only operation that sets $T(v) \leftarrow \top$ for a node with $T(v) = \bot$ is the authenticated \texttt{user\_confirm} event, which requires explicit user interaction routed through the proxy's confirmation handler. No agent action, tool result, or policy rule can invoke this operation.
 \end{proof}
 
-\paragraph{Limitations of the Proofs.}
-These proofs assume the enforcement proxy implementation faithfully realizes the specified algorithms. A formal machine-checked verification (e.g., in Coq or Dafny) would strengthen these guarantees but is beyond the scope of this work. The proofs also assume the agent framework does not provide alternative tool invocation paths---a property that must be verified for each deployment.
+\paragraph{Scope of these Arguments.}
+These invariants hold under the architectural assumptions stated in Section~\ref{sec:threat}: the enforcement proxy is not itself compromised, the agent framework exposes no alternative tool invocation paths, and the provenance graph is correctly populated. Formal machine-checked verification (e.g., in Coq or Dafny) would strengthen these guarantees but is beyond the scope of this work. The invariants make no claim about provenance \emph{resolution accuracy}---the degree to which argument provenance is correctly traced is an empirical question addressed in Sections~\ref{subsec:methodology} and~\ref{subsec:paraphrase}.
 
 \section{Detailed Experiment Results}
 \label{sec:appendix-results}

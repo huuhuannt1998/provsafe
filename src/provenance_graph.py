@@ -69,14 +69,14 @@ def trust_meet(*labels: TrustLabel) -> TrustLabel:
 def trust_join(*labels: TrustLabel) -> TrustLabel:
     """Lattice join (⊔) – only used for declassification.
 
-    Returns ⊤ if *all* labels are TRUSTED, ⊥ otherwise.
-    In normal data flow the meet is used; the join is reserved
-    for authenticated user-confirmation (declassification).
+    Returns ⊤ if *any* label is TRUSTED, ⊥ otherwise.
+    This is the LUB in L = {⊤, ⊥}: declassification only requires one
+    TRUSTED witness.  In normal data flow the meet (⊓) is used.
     """
     for lbl in labels:
-        if lbl == TrustLabel.UNTRUSTED:
-            return TrustLabel.UNTRUSTED
-    return TrustLabel.TRUSTED
+        if lbl == TrustLabel.TRUSTED:
+            return TrustLabel.TRUSTED
+    return TrustLabel.UNTRUSTED
 
 
 # ---------------------------------------------------------------------------
@@ -630,7 +630,7 @@ class ProvenanceGraph:
 
         for node_id, node in sorted_nodes:
             content_str = str(node.content).lower()
-            if value_str in content_str or content_str in value_str:
+            if value_str in content_str:
                 matching.append(node_id)
                 if len(matching) >= max_results:
                     break

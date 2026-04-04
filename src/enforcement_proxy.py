@@ -6,6 +6,7 @@ Intercepts tool calls from LLM agents, evaluates policies with provenance contex
 and enforces security decisions (allow/deny/confirm).
 """
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass, asdict
@@ -80,6 +81,8 @@ class EnforcementProxy:
         self.confirmation_handler = confirmation_handler or self._default_confirmation
         self.log_file = log_file
         self.call_logs: List[ToolCallLog] = []
+        # SHA-256 hash chain: tracks hash of previous entry for tamper-evidence
+        self._prev_log_hash: str = "0" * 64  # genesis sentinel
         
         # Statistics
         self.stats = {
@@ -159,7 +162,7 @@ class EnforcementProxy:
         )
         policy_latency_ms = (time.time() - policy_start) * 1000
         
-        # Step 4: Handle decision
+        # Step 5: Handle decision
         execution_result = None
         tool_output = None
         tool_latency_ms = None
@@ -196,7 +199,7 @@ class EnforcementProxy:
                 execution_result = ExecutionResult.REJECTED
                 self.stats["rejected"] += 1
         
-        # Step 5: Add tool result to provenance (if executed)
+        # Step 6: Add tool result to provenance (if executed)
         if tool_output is not None and execution_result in [ExecutionResult.ALLOWED, ExecutionResult.CONFIRMED]:
             # Mark tool results as untrusted (external data) unless it's a trusted system tool
             is_trusted_tool = self._is_trusted_tool(tool_name)
@@ -207,7 +210,7 @@ class EnforcementProxy:
                 metadata={"tool_call_node_id": tool_call_node_id},
             )
         
-        # Step 6: Log the call
+        # Step 7: Log the call
         log_entry = ToolCallLog(
             timestamp=datetime.now(),
             tool_name=tool_name,
@@ -304,13 +307,30 @@ class EnforcementProxy:
         return response in ["yes", "y"]
     
     def _write_log(self, log_entry: ToolCallLog):
-        """Write log entry to file."""
+        """Write log entry to file with SHA-256 hash chaining.
+
+        Each entry embeds the SHA-256 hash of the previous serialised entry
+        (genesis entry uses 64 zero hex digits).  This makes the audit log
+        tamper-evident: any post-hoc modification of an earlier entry breaks
+        the hash chain from that point forward.
+        """
         if not self.log_file:
             return
-        
+
         try:
-            with open(self.log_file, 'a') as f:
-                f.write(json.dumps(log_entry.to_dict()) + "\n")
+            entry_dict = log_entry.to_dict()
+            entry_dict["prev_hash"] = self._prev_log_hash
+
+            # Compute this entry's hash over canonical JSON (sorted keys, no indent)
+            serialised = json.dumps(entry_dict, sort_keys=True, separators=(",", ":"))
+            entry_hash = hashlib.sha256(serialised.encode("utf-8")).hexdigest()
+            entry_dict["entry_hash"] = entry_hash
+
+            with open(self.log_file, "a") as f:
+                f.write(json.dumps(entry_dict) + "\n")
+
+            # Advance the chain
+            self._prev_log_hash = entry_hash
         except Exception as e:
             print(f"Warning: Failed to write log: {e}")
     
