@@ -145,14 +145,11 @@ Taint-Everything  & \textbf{0.00\% $\pm$ 0.1}  & 9.00\% $\pm$ 2.0 & 90.75\% \\
 \bottomrule
 \end{tabular}%
 }
-\begin{flushleft}
-\scriptsize Taint-Everything results are preliminary (full 4-model run in progress at time of writing; single-model results: 0/172 attacks succeeded, 36/40 benign tasks blocked by policy).
-\end{flushleft}
 \end{table}
 
-Table~\ref{tab:baseline_comparison} presents the Taint-Everything bounding case. With all tool-call arguments marked untrusted regardless of actual lineage, \textbf{0 out of 172 attack scenarios} succeed (0.00\% ASR-IA)---blanket tainting eliminates residual attacks. However, \textbf{36 out of 40 benign tasks} (90.00\% FPR) are also blocked because legitimate tool calls that depend on user-provided arguments (device IDs, file paths, temperatures) are treated identically to attacker-derived arguments. The 10\% apparent TSR consists entirely of trials where the model produced zero tool calls (TC=0); no benign task requiring a tool call succeeded.
+Table~\ref{tab:taint_everything} presents the Taint-Everything bounding case. Across 4{,}240 trials (212 scenarios $\times$ 4 models $\times$ 5 reps), \textbf{0 of 3{,}440 attack trials} succeed (0.00\% ASR-IA)---blanket tainting eliminates residual attacks. However, \textbf{726 of 800 benign task trials} are blocked (90.75\% FPR) because legitimate tool calls that depend on user-provided arguments (device IDs, file paths, temperatures) are treated identically to attacker-derived arguments. The 9.00\% TSR consists entirely of trials where the model produced zero tool calls (TC=0); no benign task requiring a tool call succeeded.
 
-This result quantitatively validates \sys{}'s core design decision: provenance \emph{granularity} is what separates effective security from unusable security. Taint-Everything achieves the security bound but at the cost of making the agent nearly non-functional for its intended use. \sys{} achieves 1.09\% ASR-IA with 95\% TSR by distinguishing the specific arguments that trace to attacker-controlled sources---the same selective enforcement that blanket tainting sacrifices. The 95\% / 1.09\% vs.\ 10\% / 0\% comparison concretely answers the ``why not just taint everything?'' question: granular provenance provides comparable security with a 9$\times$ improvement in usability.
+This result quantitatively validates \sys{}'s core design decision: provenance \emph{granularity} is what separates effective security from unusable security. Taint-Everything achieves the security bound but at the cost of making the agent nearly non-functional for its intended use. \sys{} achieves 1.09\% ASR-IA with 95\% TSR by distinguishing the specific arguments that trace to attacker-controlled sources---the same selective enforcement that blanket tainting sacrifices. The 95\% TSR / 1.09\% ASR vs.\ 9\% TSR / 0\% ASR comparison concretely answers the ``why not just taint everything?'' question: granular provenance provides comparable security with a 9$\times$ improvement in usability.
 
 \subsection{RQ4: Cross-Model Robustness}
 
