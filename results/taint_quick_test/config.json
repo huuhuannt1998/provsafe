@@ -1,0 +1,14 @@
+{
+  "models": [
+    "meta-llama-3.1-8b-instruct"
+  ],
+  "systems": [
+    "taint_everything"
+  ],
+  "n_scenarios": 10,
+  "n_reps": 2,
+  "temperature": 0.0,
+  "total_trials": 20,
+  "timestamp": "20260404_120808",
+  "encoding_decoder": "v2_canonicalize"
+}

@@ -1,0 +1,22 @@
+{
+  "models": [
+    "meta-llama-3.1-8b-instruct",
+    "qwen2.5-7b-instruct",
+    "gemma-2-9b-it",
+    "phi-3.5-mini-instruct",
+    "llama-3.1-70b-versatile",
+    "gemini-1.5-flash",
+    "qwen3.5-122b",
+    "gpt-oss-120b",
+    "qwen3.5-397b"
+  ],
+  "systems": [
+    "taint_everything"
+  ],
+  "n_scenarios": 212,
+  "n_reps": 5,
+  "temperature": 0.0,
+  "total_trials": 9540,
+  "timestamp": "20260404_120902",
+  "encoding_decoder": "v2_canonicalize"
+}
