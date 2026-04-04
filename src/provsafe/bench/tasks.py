@@ -68,9 +68,14 @@ class BenchmarkSuite(BaseModel):
         return cls(**data)
     
     def to_yaml(self, yaml_path: str):
-        """Save benchmark suite to YAML."""
+        """Save benchmark suite to YAML.
+
+        Uses ``mode='json'`` so that Enum members are serialised as their
+        string values rather than as Python-tagged YAML objects.  This ensures
+        the output can be round-tripped through ``yaml.safe_load()``.
+        """
         with open(yaml_path, 'w') as f:
-            yaml.dump(self.model_dump(exclude_none=True), f, sort_keys=False)
+            yaml.dump(self.model_dump(mode='json', exclude_none=True), f, sort_keys=False)
     
     def get_benign_tasks(self) -> List[BenchmarkTask]:
         """Get only benign tasks."""

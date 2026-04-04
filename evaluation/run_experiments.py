@@ -153,11 +153,11 @@ def evaluate_single(
         system_obj = system_cls(model, provider_cfg.api_url, provider_cfg.api_key)
 
         # Apply per-rep temperature perturbation for non-zero variation.
-        # Rep 1 uses T=0.0 (greedy), reps 2+ use small temperature to
-        # introduce natural LLM stochasticity while keeping output quality.
-        rep_temperature = 0.0 if rep == 1 else round(0.05 * rep, 2)
-        # Cap at a low temperature to stay near-deterministic
-        rep_temperature = min(rep_temperature, 0.2)
+        # Rep 1 uses T=0.0 (greedy), reps 2-5 use T=0.05, 0.10, 0.15, 0.20
+        # (increasing by 0.05 per rep) to span the low-temperature regime while
+        # keeping outputs near-deterministic. Each rep also uses a unique
+        # cryptographic seed, ensuring statistically independent trials.
+        rep_temperature = round(0.05 * (rep - 1), 2)
 
         start = time.time()
         result = system_obj.execute_scenario(scenario, temperature=rep_temperature, seed=trial_seed)

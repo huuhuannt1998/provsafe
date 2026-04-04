@@ -50,7 +50,7 @@ Our 200-scenario benchmark is author-crafted, enabling precise control but intro
 Our 3B--122B evaluation confirms scalability (0\% ASR-IA on 122B), but proprietary models (GPT-4, Claude) with different tool-calling conventions remain untested.
 
 \paragraph{Repetition Design.}
-We vary temperature across repetitions ($T=0.0$ for rep~1; $T \in \{0.05, \ldots, 0.20\}$ for reps~2--5) with unique cryptographic seeds, ensuring statistical independence for bootstrap CIs while spanning the low-temperature regime relevant to tool-calling agents.
+Each of the five repetitions uses a unique cryptographic seed derived from \texttt{SHA-256(scenario\_id $\|$ system $\|$ model $\|$ rep)}, ensuring trial-level independence. Temperature varies as $T=0.0$ (greedy) for rep~1 and $T \in \{0.10, 0.15, 0.20, 0.20\}$ for reps~2--5 (reps~4 and 5 share $T=0.20$ but use distinct seeds). All reported confidence intervals are 95\% Wilson-score intervals computed over pooled trials; they depend only on the observed proportion and trial count, not on rep-to-rep temperature variation. The consistent per-rep ASR (1.09\% across all five reps) reflects the structural stability of boundary enforcement rather than insufficient temperature diversity.
 
 \paragraph{User Study.}
 Our TSR measures system-level usability. We do not evaluate confirmation fatigue or user comprehension of provenance explanations---a user study is essential future work.
