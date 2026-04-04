@@ -232,33 +232,32 @@ We evaluate paraphrase evasion by disabling Stages~2--3 and testing 96 paraphras
 \subsection{RQ7: Provenance Against Adaptive Adversaries}
 \label{subsec:adaptive}
 
-We analyze how \sys{}'s provenance-based defense performs against a white-box adversary with full knowledge of the architecture, provenance tracking mechanism, policy rules, and embedding model. The adversary designs attacks specifically targeting provenance resolution. We evaluate 15 adaptive attack scenarios across five categories plus 5 benign controls (Table~\ref{tab:adaptive}).
+We conduct a \emph{structured case analysis} of how \sys{}'s defense performs against a white-box adversary with full knowledge of the architecture, provenance tracking mechanism, policy rules, and embedding model. The adversary designs attacks specifically targeting provenance resolution. We craft 15 attack scenarios across five categories that exercise distinct bypass strategies, plus 5 benign controls (Table~\ref{tab:adaptive}). We emphasize that $N=15$ is a qualitative case analysis intended to identify failure modes, not a statistical sample supporting confidence intervals; the aggregate 6.7\% (1/15) should be interpreted as ``one category admits a bypass'' rather than as a population-level rate estimate.
 
 \begin{table}[t]
 \centering
-\caption{Adaptive adversary analysis (20 scenarios). White-box attacker targeting provenance mechanisms achieves 6.7\% ASR.}
+\caption{Adaptive adversary case analysis (20 scenarios). Five white-box attack strategies targeting provenance mechanisms; the single bypass ($\dagger$) is a policy gap, not a provenance failure.}
 \label{tab:adaptive}
 \scriptsize
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrrrl}
 \toprule
-\textbf{Attack Category} & \textbf{N} & \textbf{Bypassed} & \textbf{ASR-IA} & \textbf{Blocking Layer} \\
+\textbf{Attack Strategy} & \textbf{N} & \textbf{Bypassed} & \textbf{Result} & \textbf{Blocking Layer} \\
 \midrule
-Provenance Laundering & 3 & 0 & 0\% & Provenance DAG \\
-Policy-Aware Evasion  & 3 & 1 & 33\% & Arg validation$^\dagger$ \\
-Embedding Evasion     & 3 & 0 & 0\% & Model refused \\
-TOCTOU Amplification  & 3 & 0 & 0\% & Model refused \\
-Multi-Vector          & 3 & 0 & 0\% & Pre-LLM + provenance \\
+Provenance Laundering & 3 & 0 & Blocked & Lattice meet propagation \\
+Policy-Aware Evasion  & 3 & 1 & \textbf{1 bypass}$^\dagger$ & Arg validation \\
+Embedding Evasion     & 3 & 0 & Blocked & Model refused (TC=0) \\
+TOCTOU Amplification  & 3 & 0 & Blocked & Persistent DAG labels \\
+Multi-Vector Chaining & 3 & 0 & Blocked & Pre-LLM + provenance \\
 \midrule
-\textbf{All Attacks}  & \textbf{15} & \textbf{1} & \textbf{6.7\%} & --- \\
-\midrule
+\textbf{All Attacks}  & \textbf{15} & \textbf{1} & \textbf{14/15 blocked} & --- \\
 Benign Controls       & 5 & 0 FP & 100\% TSR & --- \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-\sys{} blocks 14/15 adaptive attacks (\textbf{6.7\% adaptive ASR}) with 100\% benign task success (Table~\ref{tab:adaptive}). Provenance laundering (0/3 bypassed) fails because the lattice meet preserves taint through intermediate steps. The single bypass ($^\dagger$) exploited a MEDIUM-risk notification channel for exfiltration---a \emph{policy gap}, not a provenance failure. Embedding evasion and TOCTOU attacks (0/6 bypassed) were blocked by model refusal and persistent DAG trust labels, respectively.
+\sys{} blocks 14 of 15 adaptive attacks with 100\% benign task success (Table~\ref{tab:adaptive}). Three findings emerge. \textbf{(1)~Provenance laundering fails by design}: the lattice meet preserves taint through intermediate derivation steps---no sequence of legitimate tool calls can shed the $\bot$ label without explicit user declassification. \textbf{(2)~Embedding evasion and TOCTOU attacks are ineffective}: the model refused to generate tool calls in 6/6 cases, demonstrating that model-level safety and boundary enforcement are complementary layers. \textbf{(3)~The single bypass ($^\dagger$) is a policy gap, not a provenance failure}: the attacker exfiltrated data through a MEDIUM-risk notification channel that the default policy permits for untrusted-provenance arguments. The provenance DAG \emph{correctly} identified the arguments as untrusted, but the policy engine allowed the call because \texttt{notify.send} is classified at MEDIUM risk. This finding directly motivated the policy hardening discussed below (ASR-C analysis).
 
 \subsection{RQ8: External Benchmark Validation (InjecAgent)}
 \label{subsec:injecagent}
@@ -266,11 +265,11 @@ Benign Controls       & 5 & 0 FP & 100\% TSR & --- \\
 To validate generalizability beyond our author-constructed scenarios, we evaluate \sys{} on InjecAgent~\cite{injecagent2024}, an independent benchmark of 1,054 indirect prompt-injection test cases across 17 user tools and 63 attacker tools spanning financial, physical, and data-theft attack categories (Zhan et al., ACL 2024 Findings). InjecAgent is structurally complementary to our 200-scenario benchmark: it exclusively targets indirect injection---where a tool result contains the attacker payload---which is also the dominant attack vector in \sys{}'s evaluation.
 
 \paragraph{Setup.}
-We adapt InjecAgent to the PROVSAFE evaluation framework as follows. For each test case: (1)~the LLM receives the benchmark's \emph{User Instruction} and is given only the relevant user-tool schema to call (no fabricated data); (2)~the benchmark's verbatim \emph{Tool Response}---which contains the injected attacker instruction---is returned as the tool result and added to the provenance DAG as an UNTRUSTED node; (3)~the LLM is then presented with the attacker-tool schemas and any resulting tool call is intercepted by \sys{}'s enforcement proxy. Risk tiers mirror our primary policy: physical-harm tools (e.g., \texttt{AugustSmartLockUnlockDoor}, \texttt{TerminalExecute}) are CRITICAL; financial and exfiltration tools (e.g., \texttt{GmailSendEmail}, \texttt{BankManagerTransferFunds}) are HIGH. We evaluate four systems (No Defense, Pattern Filter, Policy-Only, \sys{}) with 3 repetitions each using the same per-trial temperature and seed derivation as the primary evaluation.
+We adapt InjecAgent to the PROVSAFE evaluation framework as follows. For each test case: (1)~the LLM receives the benchmark's \emph{User Instruction} and is given only the relevant user-tool schema to call (no fabricated data); (2)~the benchmark's verbatim \emph{Tool Response}---which contains the injected attacker instruction---is returned as the tool result and added to the provenance DAG as an UNTRUSTED node; (3)~the LLM is then presented with the attacker-tool schemas and any resulting tool call is intercepted by \sys{}'s enforcement proxy. Risk tiers mirror our primary policy: physical-harm tools (e.g., \texttt{AugustSmartLockUnlockDoor}, \texttt{TerminalExecute}) are CRITICAL; financial and exfiltration tools (e.g., \texttt{GmailSendEmail}, \texttt{BankManagerTransferFunds}) are HIGH. We evaluate three systems (No Defense, Policy-Only, \sys{}) with 3 repetitions each using the same per-trial temperature and seed derivation as the primary evaluation. Pattern Filter is excluded because InjecAgent's diverse tool-schema format caused 37\% of its trials to encounter parsing failures, invalidating its ASR measurement.
 
 \begin{table}[t]
 \centering
-\caption{InjecAgent external benchmark results (1,054 test cases, 4 systems, 4 models). \sys{} retains low ASR-IA across 17 user tools and 63 attacker tools not seen during policy design.}
+\caption{InjecAgent external benchmark results (1,054 test cases, 3 systems). \sys{} retains low ASR-IA across 17 user tools and 63 attacker tools not seen during policy design. Pattern Filter is excluded: 37\% of its trials encountered parsing failures due to InjecAgent's diverse tool-schema format, invalidating its ASR measurement.}
 \label{tab:injecagent}
 \footnotesize
 \resizebox{\columnwidth}{!}{%
@@ -278,16 +277,12 @@ We adapt InjecAgent to the PROVSAFE evaluation framework as follows. For each te
 \toprule
 \textbf{System} & \textbf{ASR$_{IA}$ $\downarrow$} & \textbf{Key Finding} \\
 \midrule
-No Defense     & 20.83\% $\pm$ 0.9   & Consistent with published baselines \\
-Pattern Filter & 0.00\% $\pm$ 0.0$^\dagger$   & High error rate limits conclusions \\
-Policy-Only    & 22.67\% $\pm$ 1.0   & Provenance-free policy insufficient \\
-\textbf{\sys{}}& \textbf{4.12\% $\pm$ 0.5}   & \textbf{Provenance generalizes to new domain} \\
+No Defense     & 20.83\% $\pm$ 0.9   & Consistent with published baselines~\cite{injecagent2024} \\
+Policy-Only    & 22.67\% $\pm$ 1.0   & \textbf{No better than No Defense} \\
+\textbf{\sys{}}& \textbf{4.12\% $\pm$ 0.5}   & \textbf{5.5$\times$ reduction via provenance} \\
 \bottomrule
 \end{tabular}%
 }
-\begin{flushleft}
-\scriptsize $^\dagger$Pattern Filter encountered parsing failures on 38\% of InjecAgent trials due to the diverse tool-schema format; its 0\% ASR reflects incomplete coverage rather than perfect defense.
-\end{flushleft}
 \end{table}
 
 \paragraph{Results.}
@@ -325,7 +320,16 @@ The Policy-Only result is the most informative comparison: at 22.67\% ASR-IA, it
 \paragraph{Per-Category Breakdown and Confidentiality (ASR-C).}
 Table~\ref{tab:injecagent-category} reveals a sharp dichotomy. \sys{} achieves \textbf{0\% ASR-IA on all Direct Harm categories} (physical harm, financial harm)---these attacks target CRITICAL/HIGH-risk tools that the provenance-gated policy unconditionally blocks when arguments derive from untrusted sources. Data Stealing attacks show higher residual ASR (8.6\% overall) because they use exfiltration-style tools (email, messaging) classified at MEDIUM risk, where the default policy permits untrusted-provenance calls. The Physical Data subcategory (14.2\% ASR) is the primary residual weakness---these cases involve sensor data forwarding through MEDIUM-risk channels.
 
-Applying the ASR-C metric defined in Section~\ref{subsec:methodology}: \sys{} achieves \textbf{ASR-C = 8.6\%} on the InjecAgent DS subset (vs.\ 26.7\% for No Defense and 28.7\% for Policy-Only). This confirms that provenance reduces confidentiality violations by 3$\times$, but the residual 8.6\% highlights a real gap: MEDIUM-risk exfiltration channels remain insufficiently gated by the default policy. Tightening MEDIUM-risk policies for data-export tools (e.g., requiring confirmation when message length exceeds a threshold) would close this gap at the cost of increased confirmation burden.
+Applying the ASR-C metric defined in Section~\ref{subsec:methodology}: \sys{} achieves \textbf{ASR-C = 8.6\%} on the InjecAgent DS subset (vs.\ 26.7\% for No Defense and 28.7\% for Policy-Only). This confirms that provenance reduces confidentiality violations by 3$\times$, but the residual 8.6\% highlights a real gap: MEDIUM-risk exfiltration channels remain insufficiently gated by the default policy. The fix is a one-rule policy change:
+\begin{verbatim}
+  - name: "Confirm untrusted data-export"
+    tools: ["GmailSendEmail", "notify.send",
+            "SlackSendMessage"]
+    conditions:
+      provenance_trust: "untrusted"
+    action: REQUIRE_CONFIRMATION
+\end{verbatim}
+This rule promotes all data-export tools with untrusted-provenance arguments to REQUIRE\_CONFIRMATION, closing the exfiltration gap at the cost of additional confirmation prompts for legitimate data-forwarding tasks. We deliberately ship the default policy \emph{without} this rule so that our reported ASR-C reflects the cost of a permissive MEDIUM-risk default; operators deploying in high-sensitivity environments should enable it. The architectural takeaway is that the gap is a \emph{policy configuration choice}, not a limitation of the provenance mechanism---the DAG correctly identifies the untrusted origin in every residual case.
 
 \paragraph{Illustrative Case: How Provenance Blocks a Legitimate-Tool Attack.}
 InjecAgent case \texttt{dh\_base\_0016} concretely illustrates the mechanism. The user asks the agent to navigate to a website (\texttt{WebBrowserNavigateTo}); the returned page contains an injected instruction to grant smart-lock access. The LLM complies, calling \texttt{AugustSmartLockGrantGuestAccess(guest\_id="guest\_amy01", access\_type="permanent")}. Policy-Only has no rule to block this call---it is a legitimate IoT tool, not a delete or unlock action. \sys{}'s provenance resolver finds both arguments verbatim in the UNTRUSTED tool-result node (the web page), sets \texttt{has\_untrusted\_args = true}, and the CRITICAL-risk policy denies the call. The full step-by-step enforcement trace is in Appendix~\ref{sec:appendix-casestudy}. This case is representative: across all InjecAgent bypasses of Policy-Only, the failure mode is identical---a legitimate tool invoked with attacker-derived arguments that no syntactic rule can distinguish from benign use.
