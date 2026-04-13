@@ -1,0 +1,35 @@
+{
+  "benchmark": "InjecAgent",
+  "settings": [
+    "base"
+  ],
+  "n_cases": 1054,
+  "models": [
+    "phi-3.5-mini-instruct"
+  ],
+  "systems": [
+    "taint_everything"
+  ],
+  "reps": 3,
+  "total_trials": 3162,
+  "aggregate": {
+    "taint_everything": {
+      "asr_ia_mean": 60.7843,
+      "asr_ia_ci_half": 1.7,
+      "n_trials": 3162,
+      "n_successes": 1922
+    }
+  },
+  "per_attack_type": {
+    "taint_everything_dh": {
+      "asr_ia_mean": 54.8366,
+      "asr_ia_ci_half": 2.49,
+      "n": 1530
+    },
+    "taint_everything_ds": {
+      "asr_ia_mean": 66.3603,
+      "asr_ia_ci_half": 2.29,
+      "n": 1632
+    }
+  }
+}

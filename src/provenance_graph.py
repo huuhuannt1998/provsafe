@@ -45,14 +45,16 @@ class TrustLabel(Enum):
     ⊥ (UNTRUSTED) – originates from an external, unverified source.
     DERIVED       – placeholder; resolved to ⊤ or ⊥ via lattice meet.
     """
-    TRUSTED = "trusted"      # ⊤  – user input, system config
+
+    TRUSTED = "trusted"  # ⊤  – user input, system config
     UNTRUSTED = "untrusted"  # ⊥  – external data (devices, files, web)
-    DERIVED = "derived"      # Resolved by propagation
+    DERIVED = "derived"  # Resolved by propagation
 
 
 # ---------------------------------------------------------------------------
 # Lattice operations
 # ---------------------------------------------------------------------------
+
 
 def trust_meet(*labels: TrustLabel) -> TrustLabel:
     """Lattice meet (⊓) over trust labels.
@@ -83,6 +85,7 @@ def trust_join(*labels: TrustLabel) -> TrustLabel:
 # PROV-DM Node Types  (maps to prov:Entity sub-types)
 # ---------------------------------------------------------------------------
 
+
 class ProvDMType(str, Enum):
     """PROV-DM entity sub-types used in PROVSAFE.
 
@@ -92,17 +95,19 @@ class ProvDMType(str, Enum):
       DERIVED_FACT → prov:Entity  (wasDerivedFrom other entities)
       TOOL_CALL    → prov:Activity (proposed tool invocation, used for policy)
     """
-    INPUT = "input"              # User command or system config
+
+    INPUT = "input"  # User command or system config
     TOOL_RESULT = "tool_result"  # External tool output
     DERIVED_FACT = "derived_fact"  # LLM-generated, derived from other nodes
-    TOOL_CALL = "tool_call"      # Proposed tool invocation
+    TOOL_CALL = "tool_call"  # Proposed tool invocation
 
 
 class ProvDMRelation(str, Enum):
     """PROV-DM edge types."""
+
     WAS_DERIVED_FROM = "wasDerivedFrom"  # Entity → Entity
     WAS_GENERATED_BY = "wasGeneratedBy"  # Entity → Activity
-    USED = "used"                        # Activity → Entity
+    USED = "used"  # Activity → Entity
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +124,7 @@ def _get_embedding_model():
     if _embedding_model is None:
         try:
             from sentence_transformers import SentenceTransformer
+
             _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
             logger.info("Loaded embedding model all-MiniLM-L6-v2")
         except ImportError:
@@ -153,6 +159,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 @dataclass
 class ProvenanceNode:
     """A node in the provenance DAG (PROV-DM Entity)."""
+
     node_id: str
     source_type: str  # Legacy compat: "user_input", "tool_result", etc.
     prov_type: ProvDMType  # PROV-DM entity sub-type
@@ -311,9 +318,7 @@ class ProvenanceGraph:
             for parent_id in parent_ids:
                 if parent_id in self.edges and node_id in self.edges[parent_id]:
                     self.edges[parent_id].remove(node_id)
-            raise ValueError(
-                f"Adding node {node_id} would create a cycle in the provenance DAG"
-            )
+            raise ValueError(f"Adding node {node_id} would create a cycle in the provenance DAG")
 
         return node_id
 
@@ -365,9 +370,7 @@ class ProvenanceGraph:
         # If there are no sources (empty derivation), conservative default is
         # UNTRUSTED — a generated value with no traceable origin should not
         # be assumed safe.
-        source_labels = [
-            self._effective_trust(nid) for nid in source_node_ids
-        ]
+        source_labels = [self._effective_trust(nid) for nid in source_node_ids]
         trust_label = trust_meet(*source_labels) if source_labels else TrustLabel.UNTRUSTED
 
         return self.add_node(
@@ -417,7 +420,8 @@ class ProvenanceGraph:
         node = self.nodes[node_id]
         ancestors = self._get_all_ancestors(node_id)
         untrusted_ancestors = [
-            self.nodes[aid] for aid in ancestors
+            self.nodes[aid]
+            for aid in ancestors
             if self.nodes[aid].trust_label == TrustLabel.UNTRUSTED
         ]
 
@@ -428,7 +432,8 @@ class ProvenanceGraph:
 
         return {
             "node": node,
-            "is_untrusted": len(untrusted_ancestors) > 0 or node.trust_label == TrustLabel.UNTRUSTED,
+            "is_untrusted": len(untrusted_ancestors) > 0
+            or node.trust_label == TrustLabel.UNTRUSTED,
             "untrusted_ancestors": untrusted_ancestors,
             "all_ancestors": [self.nodes[aid] for aid in ancestors],
             "trust_path": trust_path,
@@ -450,8 +455,7 @@ class ProvenanceGraph:
 
         ancestors = self._get_all_ancestors(node_id)
         all_labels = [node.trust_label] + [
-            self.nodes[aid].trust_label for aid in ancestors
-            if aid in self.nodes
+            self.nodes[aid].trust_label for aid in ancestors if aid in self.nodes
         ]
         return trust_meet(*all_labels)
 
@@ -526,7 +530,9 @@ class ProvenanceGraph:
         }
 
     def _find_node_by_embedding(
-        self, value: Any, threshold: Optional[float] = None,
+        self,
+        value: Any,
+        threshold: Optional[float] = None,
     ) -> Optional[Tuple[str, float]]:
         """Find the best-matching node via cosine similarity over embeddings.
 

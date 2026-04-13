@@ -13,11 +13,8 @@ Usage:
 """
 
 import json
-import os
 import sys
 import time
-from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -36,16 +33,16 @@ LMSTUDIO_API = "http://localhost:1234/api/v1"
 
 # 4 models that produce tool calls reliably
 MODELS = [
-    "meta-llama-3.1-8b-instruct",          # 8B — Meta
-    "qwen2.5-7b-instruct",                 # 7B — Alibaba
-    "gemma-2-9b-it",                       # 9B — Google
-    "phi-3.5-mini-instruct",               # 3B — Microsoft
+    "meta-llama-3.1-8b-instruct",  # 8B — Meta
+    "qwen2.5-7b-instruct",  # 7B — Alibaba
+    "gemma-2-9b-it",  # 9B — Google
+    "phi-3.5-mini-instruct",  # 3B — Microsoft
 ]
 
 BASELINES = {
-    "no_defense":     NoDefenseSystem,
+    "no_defense": NoDefenseSystem,
     "pattern_filter": PatternFilterSystem,
-    "policy_only":    PolicyOnlySystem,
+    "policy_only": PolicyOnlySystem,
 }
 
 # Load scenarios
@@ -125,7 +122,7 @@ def lmstudio_swap(model: str, context_length: int = 4096) -> bool:
             print(f"  ✅ Verified {model} is ready")
             return True
         time.sleep(5)
-    print(f"  ⚠️  Could not verify — proceeding anyway")
+    print("  ⚠️  Could not verify — proceeding anyway")
     return True
 
 
@@ -134,7 +131,7 @@ def evaluate_single(
     system_obj, system_name: str, model: str, scenario: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Evaluate a single scenario with a given baseline system."""
-    model_short = model.split("/")[-1][:20]
+    _model_short = model.split("/")[-1][:20]  # noqa: F841
     try:
         start_time = time.time()
         result = system_obj.execute_scenario(scenario)
@@ -157,9 +154,7 @@ def evaluate_single(
         tc = eval_result["tool_calls"]
         status = "✓" if not eval_result["error"] else "✗"
         asr_flag = " 🚨ASR" if eval_result["attack_success"] else ""
-        print(
-            f"    {status} {system_name:16s} {latency:.1f}s TC:{tc}{asr_flag}"
-        )
+        print(f"    {status} {system_name:16s} {latency:.1f}s TC:{tc}{asr_flag}")
         return eval_result
 
     except Exception as e:
@@ -183,12 +178,8 @@ def compute_metrics(results: List[Dict], label: str) -> Dict[str, Any]:
     benign = [r for r in results if r["scenario_type"] == "benign"]
     attacks = [r for r in results if r["scenario_type"] == "attack"]
 
-    successful_benign = sum(
-        1 for r in benign if not r["blocked"] and r["error"] is None
-    )
-    successful_attacks = sum(
-        1 for r in attacks if r["attack_success"] and not r["blocked"]
-    )
+    successful_benign = sum(1 for r in benign if not r["blocked"] and r["error"] is None)
+    successful_attacks = sum(1 for r in attacks if r["attack_success"] and not r["blocked"])
 
     valid_lats = [r["latency"] for r in results if r["latency"] > 0]
 
@@ -272,7 +263,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run baseline systems")
     parser.add_argument("--quick", action="store_true", help="First 10 scenarios only")
-    parser.add_argument("--skip-done", action="store_true", help="Skip models with existing results")
+    parser.add_argument(
+        "--skip-done", action="store_true", help="Skip models with existing results"
+    )
     parser.add_argument("--model", type=str, help="Run a single model")
     parser.add_argument("--ctx", type=int, default=4096, help="Context length")
     args = parser.parse_args()
@@ -281,7 +274,9 @@ if __name__ == "__main__":
     scenarios = SCENARIOS[:10] if args.quick else SCENARIOS
 
     total = len(models)
-    print(f"📊 Baseline evaluation — {total} models × {len(scenarios)} scenarios × {len(BASELINES)} baselines")
+    print(
+        f"📊 Baseline evaluation — {total} models × {len(scenarios)} scenarios × {len(BASELINES)} baselines"
+    )
     print(f"   Total evaluations: {total * len(scenarios) * len(BASELINES)}")
     print()
 

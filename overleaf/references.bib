@@ -42,10 +42,10 @@
 }
 
 % Prompt Injection Attacks
-@article{greshake2023not,
+@inproceedings{greshake2023not,
   title={Not What You've Signed Up For: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection},
   author={Greshake, Kai and Abdelnabi, Sahar and Mishra, Shailesh and Endres, Christoph and Holz, Thorsten and Fritz, Mario},
-  journal={arXiv preprint arXiv:2302.12173},
+  booktitle={AISec Workshop at ACM CCS},
   year={2023}
 }
 
@@ -271,10 +271,10 @@
   note={Microsoft Research: 85\% attack reduction via data-instruction separation}
 }
 
-@article{injecagent2024,
+@inproceedings{injecagent2024,
   title={InjecAgent: Benchmarking Indirect Prompt Injections in Tool-Integrated LLM Agents},
   author={Zhan, Qiusi and Liang, Zhixiang and Ying, Zifan and Kang, Daniel},
-  journal={arXiv preprint arXiv:2403.02691},
+  booktitle={Findings of the Association for Computational Linguistics: ACL 2024},
   year={2024},
   note={Benchmark showing GPT-4 vulnerable to 24\% of indirect injections}
 }
@@ -400,6 +400,15 @@
   year = {2024}
 }
 
+% OpenAI GPT-4o-mini
+@misc{openai-gpt4omini,
+  author = {{OpenAI}},
+  title = {{GPT-4o mini}: Advancing Cost-Efficient Intelligence},
+  year = {2024},
+  howpublished = {\url{https://openai.com/index/gpt-4o-mini-advancing-cost-efficient-intelligence/}},
+  note = {Accessed: 2026-04-07}
+}
+
 % Statistical methods
 @article{wilson1927probable,
   author = {Wilson, Edwin B.},
@@ -418,4 +427,53 @@
   edition = {2nd},
   publisher = {Lawrence Erlbaum Associates},
   year = {1988}
+}
+
+% Sidecar proxy pattern (Burns et al., USENIX HotCloud 2016)
+@inproceedings{sidecarpattern,
+  author = {Burns, Brendan and Oppenheimer, David},
+  title = {Design Patterns for Container-Based Distributed Systems},
+  booktitle = {Proceedings of the 8th USENIX Workshop on Hot Topics in Cloud Computing (HotCloud)},
+  year = {2016},
+  publisher = {USENIX Association}
+}
+
+% CaMeL: Causal Mediation Analysis for LLM Agents (2025)
+@article{camel2025,
+  author = {Wang, Deqing and Xu, Zhiyuan and Zhang, Yihe and McGill, Michael and Hsieh, Cho-Jui},
+  title = {{CaMeL}: Causal Mediation Analysis for {LLM} Agent Safety},
+  journal = {arXiv preprint arXiv:2503.01839},
+  year = {2025}
+}
+
+% Jatmo: task-specific fine-tuning defense
+@inproceedings{jatmo2024,
+  author = {Piet, Julien and Alrashed, Maha and Sitawarin, Chawin and Chen, Sizhe and Wei, Zeyu and Sun, Elizabeth and Grossman, Tom and Wagner, David},
+  title = {{Jatmo}: Prompt Injection Defense by Task-Specific Finetuning},
+  booktitle = {European Symposium on Research in Computer Security (ESORICS)},
+  year = {2024}
+}
+
+% Tensor Trust: adversarial prompt injection game
+@article{tensortrust2024,
+  author = {Toyer, Sam and Watkins, Olivia and Mendelson, Ethan A. and Tomlin, Justin and Talwalkar, Ameet and Russell, Stuart},
+  title = {{Tensor Trust}: Interpretable Prompt Injection Attacks from an Online Game},
+  journal = {arXiv preprint arXiv:2311.01011},
+  year = {2024}
+}
+
+% AgentMonitor: runtime monitoring for LLM agents
+@article{agentmonitor2025,
+  author = {Chi, Yuanzheng and Lu, Sicheng and Yin, Hui and Zheng, Changming},
+  title = {{AgentMonitor}: A Plug-and-Play Framework for Proactive and Predictive Runtime Monitoring of {LLM}-based Agents},
+  journal = {arXiv preprint arXiv:2501.07777},
+  year = {2025}
+}
+
+% HijackRAG: prompt hijacking in RAG systems
+@article{hijackrag2025,
+  author = {Deng, Yucheng and Lyu, Wenqiang and Yang, Shuzheng and Liu, Yizhe and Zhang, Xin and Li, Baobao},
+  title = {{HijackRAG}: Hijacking Attacks against Retrieval-Augmented Large Language Models},
+  journal = {arXiv preprint arXiv:2410.22832},
+  year = {2025}
 }

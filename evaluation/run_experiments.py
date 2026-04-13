@@ -18,7 +18,6 @@ Usage:
 """
 
 import json
-import os
 import sys
 import time
 import math
@@ -46,9 +45,6 @@ from model_providers import (
     get_provider_config,
     is_lmstudio_model,
     ALL_MODELS,
-    LMSTUDIO_MODELS,
-    GROQ_MODELS,
-    GEMINI_MODELS,
 )
 
 # ── Configuration ────────────────────────────────────────────────────────────
@@ -123,7 +119,7 @@ def lmstudio_swap(model: str, context_length: int = 4096) -> bool:
             print(f"  ✅ {model} ready")
             return True
         time.sleep(5)
-    print(f"  ⚠️ Proceeding without verification")
+    print("  ⚠️ Proceeding without verification")
     return True
 
 
@@ -205,15 +201,17 @@ def wilson_ci(successes: int, trials: int, z: float = 1.96) -> Tuple[float, floa
     if trials == 0:
         return (0.0, 0.0)
     p_hat = successes / trials
-    denom = 1 + z ** 2 / trials
-    centre = (p_hat + z ** 2 / (2 * trials)) / denom
-    spread = z * math.sqrt((p_hat * (1 - p_hat) + z ** 2 / (4 * trials)) / trials) / denom
+    denom = 1 + z**2 / trials
+    centre = (p_hat + z**2 / (2 * trials)) / denom
+    spread = z * math.sqrt((p_hat * (1 - p_hat) + z**2 / (4 * trials)) / trials) / denom
     lo = max(0.0, centre - spread)
     hi = min(1.0, centre + spread)
     return (lo, hi)
 
 
-def bootstrap_ci(values: List[float], n_boot: int = 10000, alpha: float = 0.05) -> Tuple[float, float, float]:
+def bootstrap_ci(
+    values: List[float], n_boot: int = 10000, alpha: float = 0.05
+) -> Tuple[float, float, float]:
     """Bootstrap CI for a mean. Returns (mean, lo, hi)."""
     if not values:
         return (0.0, 0.0, 0.0)
@@ -222,7 +220,9 @@ def bootstrap_ci(values: List[float], n_boot: int = 10000, alpha: float = 0.05) 
     if len(arr) < 2:
         return (mean, mean, mean)
     rng = np.random.default_rng(42)
-    boot_means = [float(np.mean(rng.choice(arr, size=len(arr), replace=True))) for _ in range(n_boot)]
+    boot_means = [
+        float(np.mean(rng.choice(arr, size=len(arr), replace=True))) for _ in range(n_boot)
+    ]
     lo = float(np.percentile(boot_means, 100 * alpha / 2))
     hi = float(np.percentile(boot_means, 100 * (1 - alpha / 2)))
     return (mean, lo, hi)
@@ -257,22 +257,28 @@ def compute_metrics_with_ci(results: List[Dict], label: str = "") -> Dict:
         rep_attacks = [r for r in attacks if r["rep"] == rep]
         rep_benign = [r for r in benign if r["rep"] == rep]
         if rep_attacks:
-            rep_asr = sum(1 for r in rep_attacks if r["attack_success"] and not r["blocked"]) / len(rep_attacks) * 100
+            rep_asr = (
+                sum(1 for r in rep_attacks if r["attack_success"] and not r["blocked"])
+                / len(rep_attacks)
+                * 100
+            )
             per_rep_asr.append(rep_asr)
         if rep_benign:
-            rep_tsr = sum(1 for r in rep_benign if not r["blocked"] and r["error"] is None) / len(rep_benign) * 100
+            rep_tsr = (
+                sum(1 for r in rep_benign if not r["blocked"] and r["error"] is None)
+                / len(rep_benign)
+                * 100
+            )
             per_rep_tsr.append(rep_tsr)
 
     # Bootstrap CI on TRIAL-LEVEL binary outcomes (not per-rep aggregates).
     # Each trial is a Bernoulli outcome; resampling from all N trials gives
     # valid 95% CIs that capture both within-rep and across-rep variation.
     trial_asr_outcomes = [
-        100.0 if (r["attack_success"] and not r["blocked"]) else 0.0
-        for r in attacks
+        100.0 if (r["attack_success"] and not r["blocked"]) else 0.0 for r in attacks
     ]
     trial_tsr_outcomes = [
-        100.0 if (not r["blocked"] and r["error"] is None) else 0.0
-        for r in benign
+        100.0 if (not r["blocked"] and r["error"] is None) else 0.0 for r in benign
     ]
     asr_boot_mean, asr_boot_lo, asr_boot_hi = bootstrap_ci(trial_asr_outcomes)
     tsr_boot_mean, tsr_boot_lo, tsr_boot_hi = bootstrap_ci(trial_tsr_outcomes)
@@ -289,10 +295,16 @@ def compute_metrics_with_ci(results: List[Dict], label: str = "") -> Dict:
         "n_reps": len(reps),
         "asr": round(asr, 2),
         "asr_wilson_ci": [round(asr_lo * 100, 2), round(asr_hi * 100, 2)],
-        "asr_bootstrap": {"mean": round(asr_boot_mean, 2), "ci95": [round(asr_boot_lo, 2), round(asr_boot_hi, 2)]},
+        "asr_bootstrap": {
+            "mean": round(asr_boot_mean, 2),
+            "ci95": [round(asr_boot_lo, 2), round(asr_boot_hi, 2)],
+        },
         "tsr": round(tsr, 2),
         "tsr_wilson_ci": [round(tsr_lo * 100, 2), round(tsr_hi * 100, 2)],
-        "tsr_bootstrap": {"mean": round(tsr_boot_mean, 2), "ci95": [round(tsr_boot_lo, 2), round(tsr_boot_hi, 2)]},
+        "tsr_bootstrap": {
+            "mean": round(tsr_boot_mean, 2),
+            "ci95": [round(tsr_boot_lo, 2), round(tsr_boot_hi, 2)],
+        },
         "fpr": round(fpr, 2),
         "fpr_wilson_ci": [round(fpr_lo * 100, 2), round(fpr_hi * 100, 2)],
         "latency": {"mean": round(lat_mean, 2), "ci95": [round(lat_lo, 2), round(lat_hi, 2)]},
@@ -330,7 +342,7 @@ def pairwise_significance(
         sys_data[sys_name] = {"success": n_success, "total": len(relevant)}
 
     # Pairwise comparisons
-    pairs = [(a, b) for i, a in enumerate(systems) for b in systems[i + 1:]]
+    pairs = [(a, b) for i, a in enumerate(systems) for b in systems[i + 1 :]]
     n_comparisons = len(pairs)
     pairwise = {}
 
@@ -411,7 +423,9 @@ def run_benchmark(
     if resume and checkpoint_file.exists():
         with open(checkpoint_file) as f:
             all_results = json.load(f)
-        completed_keys = {trial_key(r["system"], r["model"], r["scenario_id"], r["rep"]) for r in all_results}
+        completed_keys = {
+            trial_key(r["system"], r["model"], r["scenario_id"], r["rep"]) for r in all_results
+        }
         print(f"📂 Resumed {len(all_results)} completed trials from {checkpoint_file}")
 
     total_trials = len(models) * len(systems) * len(scenarios) * n_reps
@@ -536,21 +550,27 @@ def run_benchmark(
     for model in models:
         model_short = model.split("/")[-1][:24]
         for sys_name in systems:
-            results_subset = [r for r in all_results if r["model"] == model and r["system"] == sys_name]
+            results_subset = [
+                r for r in all_results if r["model"] == model and r["system"] == sys_name
+            ]
             if not results_subset:
                 continue
             m = compute_metrics_with_ci(results_subset, label=f"{model_short}_{sys_name}")
             model_sys_metrics[f"{model}_{sys_name}"] = m
-            print(f"{model_short:<25} {sys_name:<18} {m['asr']:>7.2f}% {m['tsr']:>7.2f}% {m['fpr']:>7.2f}%")
+            print(
+                f"{model_short:<25} {sys_name:<18} {m['asr']:>7.2f}% {m['tsr']:>7.2f}% {m['fpr']:>7.2f}%"
+            )
     report["per_model_system"] = model_sys_metrics
 
     # Per-category ASR for PROVSAFE
     provsafe_results = [r for r in all_results if r["system"] == "provsafe"]
     cat_asr = per_category_asr(provsafe_results)
     report["provsafe_per_category"] = cat_asr
-    print(f"\nPROVSAFE Per-Category ASR-IA:")
+    print("\nPROVSAFE Per-Category ASR-IA:")
     for cat, d in cat_asr.items():
-        print(f"  {cat:<30s} {d['asr']:>6.2f}% [{d['ci95'][0]:.2f}, {d['ci95'][1]:.2f}]  ({d['bypasses']}/{d['n']})")
+        print(
+            f"  {cat:<30s} {d['asr']:>6.2f}% [{d['ci95'][0]:.2f}, {d['ci95'][1]:.2f}]  ({d['bypasses']}/{d['n']})"
+        )
 
     # Defense breakdown for PROVSAFE
     ps_attacks = [r for r in provsafe_results if r["scenario_type"] == "attack"]
@@ -578,22 +598,28 @@ def run_benchmark(
             "correction": "Bonferroni",
             "alpha": 0.05,
         }
-        print(f"\nPairwise Significance (ASR-IA, Bonferroni-corrected):")
+        print("\nPairwise Significance (ASR-IA, Bonferroni-corrected):")
         for pair, d in asr_sig.items():
             sig = "***" if d["significant_005"] else "n.s."
-            print(f"  {pair:<35s} p={d['p_adjusted']:.4f} {sig}  h={d['cohens_h']:.3f} ({d['effect_size']})")
+            print(
+                f"  {pair:<35s} p={d['p_adjusted']:.4f} {sig}  h={d['cohens_h']:.3f} ({d['effect_size']})"
+            )
     except ImportError:
         print("\n  (scipy not installed — skipping significance tests)")
         report["significance_tests"] = {"error": "scipy not installed"}
 
     # Per-rep stability
-    print(f"\nPROVSAFE Per-Rep Stability:")
+    print("\nPROVSAFE Per-Rep Stability:")
     ps_metric = sys_metrics.get("provsafe", {})
     if ps_metric.get("per_rep_asr"):
         print(f"  ASR per rep: {ps_metric['per_rep_asr']}")
         print(f"  TSR per rep: {ps_metric['per_rep_tsr']}")
-        asr_std = float(np.std(ps_metric["per_rep_asr"])) if len(ps_metric["per_rep_asr"]) > 1 else 0
-        tsr_std = float(np.std(ps_metric["per_rep_tsr"])) if len(ps_metric["per_rep_tsr"]) > 1 else 0
+        asr_std = (
+            float(np.std(ps_metric["per_rep_asr"])) if len(ps_metric["per_rep_asr"]) > 1 else 0
+        )
+        tsr_std = (
+            float(np.std(ps_metric["per_rep_tsr"])) if len(ps_metric["per_rep_tsr"]) > 1 else 0
+        )
         print(f"  ASR std: {asr_std:.3f}%  TSR std: {tsr_std:.3f}%")
         report["provsafe_stability"] = {
             "asr_std": round(asr_std, 4),
@@ -622,7 +648,11 @@ if __name__ == "__main__":
     parser.add_argument("--reps", type=int, default=5, help="Number of repetitions per scenario")
     parser.add_argument("--quick", action="store_true", help="Quick test: 10 scenarios, 2 reps")
     parser.add_argument("--model", type=str, help="Run single model")
-    parser.add_argument("--system", type=str, help="Run single system (no_defense|pattern_filter|policy_only|provsafe)")
+    parser.add_argument(
+        "--system",
+        type=str,
+        help="Run single system (no_defense|pattern_filter|policy_only|provsafe)",
+    )
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     parser.add_argument("--ctx", type=int, default=4096, help="Context length")
     parser.add_argument("--output", type=str, help="Output directory path")

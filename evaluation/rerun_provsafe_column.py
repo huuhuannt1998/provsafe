@@ -42,20 +42,20 @@ LMSTUDIO_URL = "http://localhost:1234/v1/chat/completions"
 LMSTUDIO_KEY = "lm-studio"  # LM Studio ignores this but the header is required
 
 LMSTUDIO_MODELS = [
-    "meta-llama-3.1-8b-instruct",          # 8B — Meta Llama 3.1
-    "qwen2.5-7b-instruct",                 # 7B — Qwen/Alibaba
-    "gemma-2-9b-it",                       # 9B — Google DeepMind
+    "meta-llama-3.1-8b-instruct",  # 8B — Meta Llama 3.1
+    "qwen2.5-7b-instruct",  # 7B — Qwen/Alibaba
+    "gemma-2-9b-it",  # 9B — Google DeepMind
     "mistralai/mistral-7b-instruct-v0.3",  # 7B — Mistral AI
 ]
 
 # Option A (sequential, one-by-one in LM Studio)
 SEQUENTIAL_MODELS = [
-    "meta-llama-3.1-8b-instruct",          # 8B  — Meta Llama 3.1
-    "qwen2.5-7b-instruct",                 # 7B  — Qwen/Alibaba
-    "gemma-2-9b-it",                       # 9B  — Google DeepMind
+    "meta-llama-3.1-8b-instruct",  # 8B  — Meta Llama 3.1
+    "qwen2.5-7b-instruct",  # 7B  — Qwen/Alibaba
+    "gemma-2-9b-it",  # 9B  — Google DeepMind
     "mistralai/mistral-7b-instruct-v0.3",  # 7B  — Mistral AI
-    "phi-3.5-mini-instruct",               # 3B  — Microsoft Phi-3.5
-    "openai/gpt-oss-20b",                  # 20B — OpenAI (largest, run last)
+    "phi-3.5-mini-instruct",  # 3B  — Microsoft Phi-3.5
+    "openai/gpt-oss-20b",  # 20B — OpenAI (largest, run last)
 ]
 
 # Remote CCI Cluster (--remote flag)
@@ -165,7 +165,7 @@ def lmstudio_swap(model: str, context_length: int = 4096) -> bool:
             print(f"  ✅ Verified {model} is ready")
             return True
         time.sleep(5)
-    print(f"  ⚠️  Model loaded but could not verify — proceeding anyway")
+    print("  ⚠️  Model loaded but could not verify — proceeding anyway")
     return True  # optimistic: the load call succeeded
 
 
@@ -196,9 +196,7 @@ def evaluate_single(model: str, scenario: Dict[str, Any]) -> Dict[str, Any]:
         tc = eval_result["tool_calls"]
         status = "✓" if not eval_result["error"] else "✗"
         asr_flag = " 🚨ASR" if eval_result["attack_success"] else ""
-        print(
-            f"  {status} {model_short:20s} provsafe        {latency:.1f}s TC:{tc}{asr_flag}"
-        )
+        print(f"  {status} {model_short:20s} provsafe        {latency:.1f}s TC:{tc}{asr_flag}")
         return eval_result
 
     except Exception as e:
@@ -223,12 +221,8 @@ def compute_metrics(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     benign = [r for r in results if r["scenario_type"] == "benign"]
     attacks = [r for r in results if r["scenario_type"] == "attack"]
 
-    successful_benign = sum(
-        1 for r in benign if not r["blocked"] and r["error"] is None
-    )
-    successful_attacks = sum(
-        1 for r in attacks if r["attack_success"] and not r["blocked"]
-    )
+    successful_benign = sum(1 for r in benign if not r["blocked"] and r["error"] is None)
+    successful_attacks = sum(1 for r in attacks if r["attack_success"] and not r["blocked"])
 
     valid_lats = [r["latency"] for r in results if r["latency"] > 0]
 
@@ -309,7 +303,7 @@ def run_rerun(
     print("=" * 80)
     print("PROVSAFE Re-Run (Conservative Default Fix)")
     print("=" * 80)
-    print(f"Code change: Stage 3 _resolve_argument() now returns UNTRUSTED (was TRUSTED)")
+    print("Code change: Stage 3 _resolve_argument() now returns UNTRUSTED (was TRUSTED)")
     print(f"Embedding enabled: {os.environ.get('PROVSAFE_EMBEDDING', '1')}")
     print()
 
@@ -461,7 +455,9 @@ if __name__ == "__main__":
             if args.skip_done:
                 existing = list(Path("results").glob(f"provsafe_rerun_*_{model_tag}"))
                 if existing:
-                    print(f"⏭️  [{idx}/{total}] {model} — already done ({existing[0].name}), skipping")
+                    print(
+                        f"⏭️  [{idx}/{total}] {model} — already done ({existing[0].name}), skipping"
+                    )
                     continue
 
             print(f"\n{'='*70}")

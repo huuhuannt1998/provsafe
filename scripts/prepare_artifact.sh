@@ -5,7 +5,7 @@
 #
 # Creates a self-contained archive suitable for Zenodo/Figshare deposit.
 # The archive includes: source code, configs, evaluation scripts, benchmark
-# scenarios, canonical results, and documentation.
+# scenarios (212 scenarios), canonical results (26,500+ trials), and documentation.
 
 set -euo pipefail
 
@@ -50,12 +50,15 @@ cp -r tests/ "${ARTIFACT_DIR}/tests/"
 # --- Canonical results ---
 echo "[5/7] Copying canonical results..."
 mkdir -p "${ARTIFACT_DIR}/results/"
-# Primary TDSC results (v2 = canonical)
-[ -d results/tdsc_full_v2 ] && cp -r results/tdsc_full_v2/ "${ARTIFACT_DIR}/results/tdsc_full_v2/"
-# 122B validation
-[ -d results/tdsc_122b ] && cp -r results/tdsc_122b/ "${ARTIFACT_DIR}/results/tdsc_122b/"
+# Primary 212-scenario results (4 local models)
+[ -d results/full_212 ] && cp -r results/full_212/ "${ARTIFACT_DIR}/results/full_212/"
+# Taint-Everything ablation
+[ -d results/tdsc_taint_v3 ] && cp -r results/tdsc_taint_v3/ "${ARTIFACT_DIR}/results/tdsc_taint_v3/"
+# GPT-4o-mini validation
+[ -d results/gpt4omini_200scenario ] && cp -r results/gpt4omini_200scenario/ "${ARTIFACT_DIR}/results/gpt4omini_200scenario/"
 # InjecAgent results
 [ -d results/injecagent ] && cp -r results/injecagent/ "${ARTIFACT_DIR}/results/injecagent/"
+[ -d results/injecagent_gpt4omini ] && cp -r results/injecagent_gpt4omini/ "${ARTIFACT_DIR}/results/injecagent_gpt4omini/"
 # Stage analysis
 [ -d results/stage_analysis ] && cp -r results/stage_analysis/ "${ARTIFACT_DIR}/results/stage_analysis/"
 
@@ -70,7 +73,7 @@ cat > "${ARTIFACT_DIR}/README_ARTIFACT.md" << 'HEREDOC'
 
 **PROVSAFE: Provenance-Gated Policy Enforcement for Tool-Using LLM Agents**
 
-This artifact accompanies the IEEE TDSC submission and contains all code, data,
+This artifact accompanies the ACM CCS submission and contains all code, data,
 and results needed to reproduce the paper's experiments.
 
 ## Contents
@@ -79,9 +82,9 @@ and results needed to reproduce the paper's experiments.
 |-----------|-------------|
 | `src/` | PROVSAFE source code (enforcement proxy, provenance DAG, policy engine) |
 | `configs/` | YAML policy files (provsafe, permissive, strict) |
-| `evaluation/` | Experiment runners, baseline systems, benchmark scenarios |
+| `evaluation/` | Experiment runners, baseline systems, 212 benchmark scenarios |
 | `tests/` | pytest test suite |
-| `results/` | Canonical experiment results (JSON) |
+| `results/` | Canonical experiment results (26,500+ trials, JSON) |
 | `scripts/` | Setup, evaluation, and paper-number update scripts |
 
 ## Quick Start
@@ -95,11 +98,11 @@ python scripts/quick_test.py  # Smoke test
 
 ## Reproducing Results
 
-### Primary Evaluation (25,000 trials)
-Requires LM Studio with models loaded:
+### Primary Evaluation (26,500+ trials)
+Requires LM Studio with models loaded (local) or API keys (GPT-4o-mini):
 ```bash
 cd evaluation/
-python run_experiments.py          # Full run
+python run_experiments.py          # Full run (4 local models)
 python run_experiments.py --quick  # Quick test (10 scenarios)
 ```
 
@@ -111,14 +114,16 @@ python run_injecagent.py --reps 3 --setting base
 
 ### Pre-computed Results
 Canonical results are in `results/`:
-- `tdsc_full_v2/tdsc_report.json` — Primary 20,000-trial aggregate
-- `tdsc_122b/` — 122B large-model validation (5,000 trials)
-- `injecagent/` — InjecAgent benchmark results
+- `full_212/` — Primary 16,960-trial results (4 local models, 212 scenarios)
+- `tdsc_taint_v3/` — Taint-Everything ablation (4,240 trials)
+- `gpt4omini_200scenario/` — GPT-4o-mini validation (5,300 trials)
+- `injecagent/` — InjecAgent local benchmark results
+- `injecagent_gpt4omini/` — InjecAgent GPT-4o-mini results
 
 ## Requirements
 
 - Python 3.9+
-- LM Studio (for LLM inference) or Groq/Gemini API keys
+- LM Studio (for LLM inference) or OpenAI/Groq/Gemini API keys
 - See `requirements.txt` for Python dependencies
 
 ## License

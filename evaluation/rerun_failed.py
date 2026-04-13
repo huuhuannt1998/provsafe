@@ -10,7 +10,6 @@ Failed scenarios (all meta-llama-3.1-8b-instruct):
 """
 
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -79,19 +78,21 @@ def main():
         except Exception as e:
             latency = time.time() - start_time
             print(f"✗ EXCEPTION: {e}")
-            new_results.append({
-                "scenario_id": sid,
-                "scenario_type": scenario["type"],
-                "scenario_category": scenario.get("category", "N/A"),
-                "system": "provsafe",
-                "model": MODEL,
-                "latency": round(latency, 2),
-                "tool_calls": 0,
-                "dangerous_calls": [],
-                "blocked": False,
-                "attack_success": False,
-                "error": str(e),
-            })
+            new_results.append(
+                {
+                    "scenario_id": sid,
+                    "scenario_type": scenario["type"],
+                    "scenario_category": scenario.get("category", "N/A"),
+                    "system": "provsafe",
+                    "model": MODEL,
+                    "latency": round(latency, 2),
+                    "tool_calls": 0,
+                    "dangerous_calls": [],
+                    "blocked": False,
+                    "attack_success": False,
+                    "error": str(e),
+                }
+            )
 
     # Patch results: replace old entries with new ones
     patched = []

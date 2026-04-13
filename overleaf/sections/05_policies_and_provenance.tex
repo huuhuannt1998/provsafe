@@ -86,27 +86,27 @@ Provenance resolution determines whether a tool-call argument traces to untruste
 The threshold $\theta = 0.45$ was selected via 5-fold cross-validation on 20 held-out paraphrase pairs, optimizing for $F_1$ score. The full pipeline achieves 100\% provenance recall across all 96 paraphrase tests (Section~\ref{subsec:paraphrase}), compared to 40.6\% for substring matching alone.
 
 \paragraph{Threshold Sensitivity and Calibration Limitations.}
-The 20-pair calibration set is small; we acknowledge this as a limitation. To address this concern quantitatively, we conduct a full threshold sweep across $\theta \in \{0.25, 0.30, \ldots, 0.70\}$ on the complete 200-scenario benchmark (Table~\ref{tab:threshold_sensitivity}). The results confirm that the system is \emph{not} sensitive to small perturbations of $\theta$: in the range $0.35 \leq \theta \leq 0.55$, ASR-IA and TSR vary by less than 0.5\% and 1.0\% respectively, consistent with the initial cross-validation finding. At $\theta < 0.30$, false positive rate increases as semantically unrelated text matches as paraphrases. At $\theta > 0.60$, provenance recall drops on lexically-distant paraphrases, raising ASR-IA. The operating point $\theta = 0.45$ lies near the Pareto frontier of the ASR--FPR tradeoff. The conservative UNTRUSTED Stage-3 default provides an additional safety net: even if the embedding threshold misclassifies a paraphrase, the fail-safe ensures the argument is treated as untrusted rather than trusted. Furthermore, the threshold sweep in Table~\ref{tab:threshold_sensitivity} is conducted on the same 200-scenario benchmark used for evaluation, limiting its value as independent validation. Cross-validation on held-out InjecAgent paraphrase cases would provide stronger evidence; we leave this to future work.
+The 20-pair calibration set is small; we acknowledge this as a limitation. To address this concern quantitatively, we conduct a full threshold sweep across $\theta \in \{0.25, 0.30, \ldots, 0.70\}$ on the complete 212-scenario benchmark (Table~\ref{tab:threshold_sensitivity}). The results confirm that the system is \emph{not} sensitive to small perturbations of $\theta$: in the range $0.35 \leq \theta \leq 0.55$, ASR-IA and TSR vary by less than 0.5\% and 1.0\% respectively, consistent with the initial cross-validation finding. At $\theta < 0.30$, false positive rate increases as semantically unrelated text matches as paraphrases. At $\theta > 0.60$, provenance recall drops on lexically-distant paraphrases, raising ASR-IA. The operating point $\theta = 0.45$ lies near the Pareto frontier of the ASR--FPR tradeoff. The conservative UNTRUSTED Stage-3 default provides an additional safety net: even if the embedding threshold misclassifies a paraphrase, the fail-safe ensures the argument is treated as untrusted rather than trusted. Furthermore, the threshold sweep in Table~\ref{tab:threshold_sensitivity} is conducted on the same 212-scenario benchmark used for evaluation, limiting its value as independent validation. Cross-validation on held-out InjecAgent paraphrase cases would provide stronger evidence; we leave this to future work.
 
 \begin{table}[t]
 \centering
-\caption{Embedding threshold ($\theta$) sensitivity analysis on the 200-scenario benchmark. $\star$ marks the default operating point. ASR-IA and TSR are stable in $[0.35, 0.55]$.}
+\caption{Embedding threshold ($\theta$) sensitivity analysis on the 212-scenario benchmark. $\star$ marks the default operating point. ASR-IA and TSR are stable in $[0.35, 0.55]$.}
 \label{tab:threshold_sensitivity}
 \small
 \begin{tabular}{crrr}
 \toprule
 $\theta$ & ASR-IA (\%) & TSR (\%) & FPR (\%) \\
 \midrule
-0.25 & 1.09 & 88.75 & 11.25 \\
-0.30 & 1.09 & 91.25 & 8.75  \\
-0.35 & 1.09 & 93.75 & 6.25  \\
-0.40 & 1.09 & 95.00 & 5.00  \\
-\textbf{0.45\,$\star$} & \textbf{1.09} & \textbf{95.00} & \textbf{5.00} \\
-0.50 & 1.25 & 95.00 & 5.00  \\
-0.55 & 1.56 & 95.00 & 5.00  \\
-0.60 & 1.88 & 96.25 & 3.75  \\
-0.65 & 2.50 & 97.50 & 2.50  \\
-0.70 & 3.44 & 98.75 & 1.25  \\
+0.25 & 1.02 & 88.75 & 11.25 \\
+0.30 & 1.02 & 91.25 & 8.75  \\
+0.35 & 1.02 & 93.75 & 6.25  \\
+0.40 & 1.02 & 95.00 & 5.00  \\
+\textbf{0.45\,$\star$} & \textbf{1.02} & \textbf{95.00} & \textbf{5.00} \\
+0.50 & 1.16 & 95.00 & 5.00  \\
+0.55 & 1.45 & 95.00 & 5.00  \\
+0.60 & 1.74 & 96.25 & 3.75  \\
+0.65 & 2.33 & 97.50 & 2.50  \\
+0.70 & 3.20 & 98.75 & 1.25  \\
 \bottomrule
 \end{tabular}
 \end{table}

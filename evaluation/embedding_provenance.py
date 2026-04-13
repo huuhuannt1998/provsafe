@@ -12,11 +12,13 @@ from typing import List, Dict, Any, Optional, Tuple
 # Lazy-load to avoid slow import at module level
 _model = None
 
+
 def _get_model():
     """Lazy-load the sentence-transformers model."""
     global _model
     if _model is None:
         from sentence_transformers import SentenceTransformer
+
         _model = SentenceTransformer("all-MiniLM-L6-v2")
     return _model
 
@@ -47,7 +49,7 @@ def find_best_match(
     vecs = embed(all_texts)
     q_vec = vecs[0]
     c_vecs = vecs[1:]
-    scores = c_vecs @ q_vec          # dot product on L2-normed = cosine sim
+    scores = c_vecs @ q_vec  # dot product on L2-normed = cosine sim
     best_idx = int(np.argmax(scores))
     best_score = float(scores[best_idx])
     if best_score >= threshold:
@@ -57,8 +59,9 @@ def find_best_match(
 
 # ── Drop-in replacement for ProvenanceGraph.trace_argument_provenance ──
 
+
 def trace_argument_provenance_with_embeddings(
-    graph,                         # ProvenanceGraph instance
+    graph,  # ProvenanceGraph instance
     tool_call_args: Dict[str, Any],
     similarity_threshold: float = 0.45,
 ) -> Dict[str, Any]:
@@ -71,13 +74,12 @@ def trace_argument_provenance_with_embeddings(
       Stage 2  embedding similarity       *** NEW ***
       Stage 3  conservative default       (unresolved → untrusted)
     """
-    from src.provenance_graph import TrustLabel
 
     provenance_by_arg: Dict[str, Dict] = {}
     untrusted_arg_names: List[str] = []
 
     for arg_name, arg_value in tool_call_args.items():
-        arg_value_str = str(arg_value).lower()
+        _arg_value_str = str(arg_value).lower()  # noqa: F841
 
         # ── Stage 1: substring match (original) ────────────────────────
         matching_nodes = graph._find_nodes_containing(arg_value)

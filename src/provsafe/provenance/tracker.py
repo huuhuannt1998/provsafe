@@ -5,8 +5,12 @@ from datetime import datetime
 import json
 
 from .graph import (
-    ProvenanceGraph, ProvenanceNode, NodeType, TrustLabel,
-    ProvDMRelation, trust_meet,
+    ProvenanceGraph,
+    ProvenanceNode,
+    NodeType,
+    TrustLabel,
+    ProvDMRelation,
+    trust_meet,
 )
 from ..proxy.schema import ToolCallRequest, PolicyDecision
 
@@ -14,44 +18,41 @@ from ..proxy.schema import ToolCallRequest, PolicyDecision
 class ProvenanceTracker:
     """
     Tracks provenance of tool calls and their justifications.
-    
+
     Links tool calls to the source inputs (trusted/untrusted)
     that led to them, enabling integrity verification.
     """
-    
+
     def __init__(self):
         self.graph = ProvenanceGraph()
         self._session_context: Dict[str, Any] = {}
-    
+
     def add_input(
         self,
         content: Dict[str, Any],
         trust_label: TrustLabel,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Add an input node (e.g., user message, API response).
-        
+
         Returns:
             node_id of created node
         """
         node = ProvenanceNode.create(
-            node_type=NodeType.INPUT,
-            content=content,
-            trust_label=trust_label,
-            metadata=metadata
+            node_type=NodeType.INPUT, content=content, trust_label=trust_label, metadata=metadata
         )
         self.graph.add_node(node)
         return node.node_id
-    
+
     def add_derived_fact(
         self,
         content: Dict[str, Any],
         parent_ids: List[str],
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Add a derived fact (PROV-DM Entity, wasDerivedFrom parents).
-        
+
         Trust label is computed via lattice meet:
           T(v) = ⊓_{u ∈ parents} T(u)
         """
@@ -61,36 +62,36 @@ class ProvenanceTracker:
             n = self.graph.get_node(pid)
             if n:
                 parent_labels.append(n.trust_label)
-        
+
         trust_label = trust_meet(*parent_labels) if parent_labels else TrustLabel.UNKNOWN
-        
+
         node = ProvenanceNode.create(
             node_type=NodeType.DERIVED_FACT,
             content=content,
             trust_label=trust_label,
             parents=parent_ids,
             edge_relation=ProvDMRelation.WAS_DERIVED_FROM,
-            metadata=metadata
+            metadata=metadata,
         )
         self.graph.add_node(node)
         return node.node_id
-    
+
     def log_tool_call(
         self,
         request: ToolCallRequest,
         decision: PolicyDecision,
         timestamp: datetime,
-        parent_ids: Optional[List[str]] = None
+        parent_ids: Optional[List[str]] = None,
     ) -> str:
         """
         Log a tool call with its policy decision.
-        
+
         Args:
             request: Tool call request
             decision: Policy decision
             timestamp: When the call was made
             parent_ids: Input/fact nodes that justified this call
-            
+
         Returns:
             node_id of tool call node
         """
@@ -102,37 +103,34 @@ class ProvenanceTracker:
             "decision": decision.outcome.value,
             "reason_code": decision.reason_code.value,
         }
-        
+
         metadata = {
             "matched_rule": decision.matched_rule,
             "risk_tier": decision.risk_tier.value if decision.risk_tier else None,
             "timestamp": timestamp.isoformat(),
         }
-        
+
         node = ProvenanceNode.create(
             node_type=NodeType.TOOL_CALL,
             content=content,
             trust_label=TrustLabel.UNKNOWN,  # Tool calls don't have inherent trust
             parents=parent_ids or [],
-            metadata=metadata
+            metadata=metadata,
         )
         self.graph.add_node(node)
         return node.node_id
-    
+
     def add_effect(
-        self,
-        content: Dict[str, Any],
-        tool_call_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, content: Dict[str, Any], tool_call_id: str, metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Add an effect node (observable outcome of tool call).
-        
+
         Args:
             content: Effect description
             tool_call_id: Tool call that produced this effect
             metadata: Additional metadata
-            
+
         Returns:
             node_id of effect node
         """
@@ -141,17 +139,17 @@ class ProvenanceTracker:
             content=content,
             trust_label=TrustLabel.UNKNOWN,
             parents=[tool_call_id],
-            metadata=metadata
+            metadata=metadata,
         )
         self.graph.add_node(node)
         return node.node_id
-    
+
     def get_provenance_summary(self, node_id: str) -> Dict[str, Any]:
         """Get provenance summary (why-provenance query)."""
         trust_counts = self.graph.get_trust_sources(node_id)
         derivation_depth = self.graph.compute_derivation_depth(node_id)
         effective = self.graph.effective_trust(node_id)
-        
+
         return {
             "node_id": node_id,
             "effective_trust": effective.value,
@@ -160,22 +158,22 @@ class ProvenanceTracker:
             "derivation_depth": derivation_depth,
             "total_ancestors": len(self.graph.get_ancestors(node_id)),
         }
-    
+
     def export_graph(self) -> Dict[str, Any]:
         """Export full provenance graph."""
         return self.graph.to_dict()
-    
+
     def save_to_file(self, filepath: str):
         """Save provenance graph to JSON file."""
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(self.export_graph(), f, indent=2, default=str)
-    
+
     @classmethod
     def load_from_file(cls, filepath: str) -> "ProvenanceTracker":
         """Load provenance graph from JSON file."""
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             data = json.load(f)
-        
+
         tracker = cls()
         tracker.graph = ProvenanceGraph.from_dict(data)
         return tracker

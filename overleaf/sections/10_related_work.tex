@@ -2,13 +2,13 @@
 \label{sec:related}
 
 \paragraph{Prompt Injection Attacks.}
-Perez et al.~\cite{perez2022ignore} first showed LLMs cannot reliably separate instructions from data; Greshake et al.~\cite{greshake2023not} extended this to \emph{indirect} injection via external content. Benchmarks including InjecAgent~\cite{injecagent2024}, AgentDojo~\cite{agentdojo2024}, and CyberSecEval~\cite{cyberseceval2024} provide standardized evaluation, and OWASP~\cite{owasp-llm2025} now ranks prompt injection as the top LLM risk.
+Perez et al.~\cite{perez2022ignore} first showed LLMs cannot reliably separate instructions from data; Greshake et al.~\cite{greshake2023not} extended this to \emph{indirect} injection via external content. Tensor Trust~\cite{tensortrust2024} quantified injection robustness through an adversarial game, revealing systematic weaknesses across models. HijackRAG~\cite{hijackrag2025} demonstrates that retrieval-augmented systems are particularly vulnerable when injected content reaches the context window via external documents. Benchmarks including InjecAgent~\cite{injecagent2024}, AgentDojo~\cite{agentdojo2024}, and CyberSecEval~\cite{cyberseceval2024} provide standardized evaluation, and OWASP~\cite{owasp-llm2025} now ranks prompt injection as the top LLM risk.
 
 \paragraph{Input Filtering and Guardrails.}
 Pattern filters (Rebuff~\cite{rebuff-defense}, LLM Guard~\cite{llm-guard}) and learned detectors (PromptGuard~\cite{prompt-guard}) achieve moderate detection rates but cannot distinguish trusted from untrusted arguments without provenance. Production guardrails (NeMo Guardrails~\cite{nemo-guardrails}) operate at the prompt level rather than the tool-call boundary.
 
 \paragraph{Dual-LLM and Instruction Hierarchy.}
-Dual-LLM approaches (Robust Prompt~\cite{robust-prompt}, Self-Reminder~\cite{self-reminder}, Dual-Process~\cite{dual-llm-defense}) add cost or require retraining. StruQ~\cite{struq2024} and SecAlign~\cite{secalign2024} require training-time intervention; instruction hierarchy~\cite{instruction-hierarchy2024} requires fine-tuning. All are model-internal and cannot protect already-deployed models; \sys{} enforces provenance externally without model modification.
+Dual-LLM approaches (Robust Prompt~\cite{robust-prompt}, Self-Reminder~\cite{self-reminder}, Dual-Process~\cite{dual-llm-defense}) add cost or require retraining. StruQ~\cite{struq2024} and SecAlign~\cite{secalign2024} require training-time intervention; instruction hierarchy~\cite{instruction-hierarchy2024} requires fine-tuning; Jatmo~\cite{jatmo2024} fine-tunes task-specific models to ignore injected instructions but cannot generalize across tool ecosystems. All are model-internal and cannot protect already-deployed models; \sys{} enforces provenance externally without model modification.
 
 \paragraph{Output Validation and Sandboxing.}
 LangChain Guardrails~\cite{langchain-guardrails} validate tool calls but make context-free decisions; least-privilege sandboxing is too coarse for agents needing conditional access. \sys{}'s provenance-aware policies allow or deny the same tool call depending on argument origin.
@@ -23,7 +23,7 @@ Why-provenance~\cite{buneman2001provenance}, the W3C PROV-DM standard~\cite{prov
 \sys{} adapts capability-based security~\cite{miller2006capability,capsicum} to LLM tool calls and extends context-aware IoT access control (ContextIoT~\cite{jia2017contexiot}, IoTGuard~\cite{iotguard}) with provenance tracking.
 
 \paragraph{Tool-Call-Level Enforcement.}
-Invariant~\cite{invariant2024} enforces formal security rules on agent actions via a domain-specific language, checking policy violations before execution. However, its rules operate on the tool call itself (tool name, arguments) without data-lineage context---it cannot distinguish the \emph{same} tool call originating from a trusted user command versus an attacker-injected payload; the authors do not report ASR on standard injection benchmarks, making direct numerical comparison infeasible. Spotlighting~\cite{spotlighting2024} reduces injection success by 85\% via prompt delimiters but provides no enforcement mechanism and does not handle tool-call arguments. \sys{} adds the missing provenance dimension: the DAG traces each argument to its source, enabling policies that condition on \emph{where arguments came from}, not just what they contain.
+Invariant~\cite{invariant2024} enforces formal security rules on agent actions via a domain-specific language, checking policy violations before execution. However, its rules operate on the tool call itself (tool name, arguments) without data-lineage context---it cannot distinguish the \emph{same} tool call originating from a trusted user command versus an attacker-injected payload; the authors do not report ASR on standard injection benchmarks, making direct numerical comparison infeasible. CaMeL~\cite{camel2025} applies causal mediation analysis to identify whether tool-call arguments were influenced by untrusted context but requires per-query causal tracing and does not provide deterministic enforcement. AgentMonitor~\cite{agentmonitor2025} tracks agent actions at runtime but provides monitoring rather than enforcement, alerting operators post-hoc rather than blocking malicious calls in real time. Spotlighting~\cite{spotlighting2024} reduces injection success by 85\% via prompt delimiters but provides no enforcement mechanism and does not handle tool-call arguments. \sys{} adds the missing provenance dimension: the DAG traces each argument to its source, enabling policies that condition on \emph{where arguments came from}, not just what they contain.
 
 \paragraph{Qualitative Comparison.}
 Table~\ref{tab:feature-comparison} compares \sys{} with representative defenses across a taxonomy of architectural features; we report features rather than numbers to avoid misleading cross-benchmark comparison.
@@ -45,6 +45,8 @@ Spotlighting~\cite{spotlighting2024}  & P & \xmark & \xmark & \xmark & $\sim$ & 
 NeMo~\cite{nemo-guardrails}           & P & \xmark & \xmark & \cmark & \xmark & L \\
 Invariant~\cite{invariant2024}        & T & \xmark & \xmark & \xmark & \cmark & L \\
 StruQ~\cite{struq2024}                & P & \xmark & \xmark & \xmark & \cmark & L \\
+Jatmo~\cite{jatmo2024}                & P & \xmark & $\sim$ & \xmark & \cmark & L \\
+CaMeL~\cite{camel2025}                & T & $\sim$ & \xmark & \xmark & \cmark & L \\
 ToolEmu~\cite{toolemu2024}            & T & \xmark & \xmark & \xmark & $\sim$ & L \\
 \midrule
 \textbf{\sys{} (Ours)}               & T & \cmark & \cmark & \cmark & \cmark & M \\

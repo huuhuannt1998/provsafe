@@ -15,18 +15,14 @@ Usage:
 """
 
 import json
-import os
 import sys
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.provenance_graph import ProvenanceGraph
 from baseline_systems import PROVSAFESystem
 
 # ── Configuration ────────────────────────────────────────────────────────────
@@ -42,9 +38,9 @@ def wilson_ci(successes: int, trials: int, z: float = 1.96) -> Tuple[float, floa
     if trials == 0:
         return (0.0, 0.0)
     p_hat = successes / trials
-    denom = 1 + z ** 2 / trials
-    centre = (p_hat + z ** 2 / (2 * trials)) / denom
-    spread = z * ((p_hat * (1 - p_hat) + z ** 2 / (4 * trials)) / trials) ** 0.5 / denom
+    denom = 1 + z**2 / trials
+    centre = (p_hat + z**2 / (2 * trials)) / denom
+    spread = z * ((p_hat * (1 - p_hat) + z**2 / (4 * trials)) / trials) ** 0.5 / denom
     return (max(0.0, centre - spread), min(1.0, centre + spread))
 
 
@@ -71,23 +67,27 @@ def run_threshold_sweep(
 
             try:
                 result = system.execute_scenario(scenario)
-                theta_results.append({
-                    "scenario_id": scenario["id"],
-                    "scenario_type": scenario["type"],
-                    "category": scenario.get("category", "N/A"),
-                    "attack_success": result.get("attack_success", False),
-                    "blocked": result.get("blocked", False),
-                    "error": result.get("error"),
-                })
+                theta_results.append(
+                    {
+                        "scenario_id": scenario["id"],
+                        "scenario_type": scenario["type"],
+                        "category": scenario.get("category", "N/A"),
+                        "attack_success": result.get("attack_success", False),
+                        "blocked": result.get("blocked", False),
+                        "error": result.get("error"),
+                    }
+                )
             except Exception as e:
-                theta_results.append({
-                    "scenario_id": scenario["id"],
-                    "scenario_type": scenario["type"],
-                    "category": scenario.get("category", "N/A"),
-                    "attack_success": False,
-                    "blocked": False,
-                    "error": str(e),
-                })
+                theta_results.append(
+                    {
+                        "scenario_id": scenario["id"],
+                        "scenario_type": scenario["type"],
+                        "category": scenario.get("category", "N/A"),
+                        "attack_success": False,
+                        "blocked": False,
+                        "error": str(e),
+                    }
+                )
 
             if (idx + 1) % 20 == 0:
                 print(f"  [{idx + 1}/{len(scenarios)}] ...")
@@ -130,7 +130,7 @@ def run_threshold_sweep(
 
     # Summary table
     print(f"\n{'='*70}")
-    print(f"THRESHOLD SENSITIVITY ANALYSIS")
+    print("THRESHOLD SENSITIVITY ANALYSIS")
     print(f"{'='*70}")
     print(f"{'theta':>8} {'ASR-IA':>10} {'95% CI':>16} {'TSR':>8} {'FPR':>8}")
     print("-" * 56)
@@ -165,11 +165,13 @@ def run_threshold_sweep(
             f"[{m['asr_ci'][0]:.2f}, {m['asr_ci'][1]:.2f}] & "
             f"{m['tsr']:.2f} & {m['fpr']:.2f} \\\\"
         )
-    latex_lines.extend([
-        r"\bottomrule",
-        r"\end{tabular}",
-        r"\end{table}",
-    ])
+    latex_lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{table}",
+        ]
+    )
 
     with open(output_dir / "threshold_sensitivity.tex", "w") as f:
         f.write("\n".join(latex_lines))
@@ -192,7 +194,7 @@ if __name__ == "__main__":
         scenarios = json.load(f)
 
     if args.scenarios:
-        scenarios = scenarios[:args.scenarios]
+        scenarios = scenarios[: args.scenarios]
 
     run_threshold_sweep(
         model=args.model,

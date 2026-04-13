@@ -25,29 +25,29 @@
 
   \def\barwidth{1.2}
 
-  % Boundary blocked (pre-LLM + provenance/policy proxy): 25.3% -> 5.06
-  \fill[success] (2-\barwidth/2, 0) rectangle (2+\barwidth/2, 5.06);
+  % Boundary blocked (pre-LLM + provenance/policy proxy): 23.5% -> 4.70
+  \fill[success] (2-\barwidth/2, 0) rectangle (2+\barwidth/2, 4.70);
   \node[below, font=\footnotesize, align=center] at (2, -0.35) {Boundary\\Blocked};
-  \node[above, font=\footnotesize\bfseries, success!80!black] at (2, 5.06) {25.3\%};
+  \node[above, font=\footnotesize\bfseries, success!80!black] at (2, 4.70) {23.5\%};
 
-  % Model refused (TC=0): 28.4% -> 5.68
-  \fill[secondary] (4.5-\barwidth/2, 0) rectangle (4.5+\barwidth/2, 5.68);
+  % Model refused (TC=0): 27.2% -> 5.44
+  \fill[secondary] (4.5-\barwidth/2, 0) rectangle (4.5+\barwidth/2, 5.44);
   \node[below, font=\footnotesize, align=center] at (4.5, -0.35) {Model\\Refused};
-  \node[above, font=\footnotesize\bfseries, secondary] at (4.5, 5.68) {28.4\%};
+  \node[above, font=\footnotesize\bfseries, secondary] at (4.5, 5.44) {27.2\%};
 
-  % Safe tool calls: 45.2% -> 9.04
-  \fill[warning] (7-\barwidth/2, 0) rectangle (7+\barwidth/2, 9.04);
+  % Safe tool calls: 48.3% -> 9.66
+  \fill[warning] (7-\barwidth/2, 0) rectangle (7+\barwidth/2, 9.66);
   \node[below, font=\footnotesize, align=center] at (7, -0.35) {Safe\\Allowed};
-  \node[above, font=\footnotesize\bfseries, warning!80!black] at (7, 9.04) {45.2\%};
+  \node[above, font=\footnotesize\bfseries, warning!80!black] at (7, 9.66) {48.3\%};
 
-  % ASR bypasses: 1.1% -> 0.22
-  \fill[danger] (9.5-\barwidth/2, 0) rectangle (9.5+\barwidth/2, 0.22);
+  % ASR bypasses: 1.0% -> 0.20
+  \fill[danger] (9.5-\barwidth/2, 0) rectangle (9.5+\barwidth/2, 0.20);
   \node[below, font=\footnotesize, align=center] at (9.5, -0.35) {ASR-IA\\Bypassed};
-  \node[above, font=\footnotesize\bfseries, danger] at (9.5, 0.22) {1.1\%};
+  \node[above, font=\footnotesize\bfseries, danger] at (9.5, 0.20) {1.0\%};
 
   % Callout
   \node[draw, rounded corners, fill=success!10, font=\footnotesize, align=center]
-    at (7.5, 7) {Boundary-level enforcement\\blocks 25.3\% of attack trials};
+    at (7.5, 7) {Boundary-level enforcement\\blocks 23.5\% of attack trials};
 
 \end{tikzpicture}
 \end{document}

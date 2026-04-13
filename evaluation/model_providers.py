@@ -28,24 +28,37 @@ Usage:
 import os
 import time
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
+
+# Load .env file if present (evaluation/.env)
+try:
+    from dotenv import load_dotenv
+
+    _env_path = Path(__file__).parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path, override=False)
+except ImportError:
+    pass
 
 
 # =============================================================================
 # Provider configuration
 # =============================================================================
 
+
 @dataclass
 class ProviderConfig:
     """Configuration for a single LLM provider."""
-    provider: str           # "lmstudio", "groq", "gemini"
-    api_url: str            # Chat completions endpoint
-    api_key: str            # Bearer token
-    model: str              # Model identifier sent in the payload
-    rate_limit_rpm: int     # Requests per minute (0 = unlimited)
+
+    provider: str  # "lmstudio", "groq", "gemini"
+    api_url: str  # Chat completions endpoint
+    api_key: str  # Bearer token
+    model: str  # Model identifier sent in the payload
+    rate_limit_rpm: int  # Requests per minute (0 = unlimited)
     supports_tool_calling: bool = True  # All three providers support it
 
 
@@ -58,6 +71,10 @@ _GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
 
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 _GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# OpenAI (gpt-4o-mini, etc.)
+_OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+_OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # Open WebUI (university cluster — large models)
 _OPENWEBUI_URL = os.environ.get(
@@ -87,6 +104,11 @@ GEMINI_MODELS = [
     "gemini-1.5-flash",
 ]
 
+# OpenAI models (pay-per-use)
+OPENAI_MODELS = [
+    "gpt-4o-mini",
+]
+
 # Open WebUI models (university cluster — large models)
 OPENWEBUI_MODELS = [
     "qwen3.5-122b",
@@ -95,7 +117,7 @@ OPENWEBUI_MODELS = [
 ]
 
 # All available models
-ALL_MODELS = LMSTUDIO_MODELS + GROQ_MODELS + GEMINI_MODELS + OPENWEBUI_MODELS
+ALL_MODELS = LMSTUDIO_MODELS + GROQ_MODELS + GEMINI_MODELS + OPENAI_MODELS + OPENWEBUI_MODELS
 
 
 def get_provider_config(model: str) -> ProviderConfig:
@@ -138,6 +160,19 @@ def get_provider_config(model: str) -> ProviderConfig:
             model=model,
             rate_limit_rpm=15,  # Gemini free tier: 15 req/min
         )
+    elif model in OPENAI_MODELS:
+        if not _OPENAI_KEY:
+            raise ValueError(
+                f"OPENAI_API_KEY environment variable is required for model '{model}'. "
+                "Set it in evaluation/.env or export it."
+            )
+        return ProviderConfig(
+            provider="openai",
+            api_url=_OPENAI_URL,
+            api_key=_OPENAI_KEY,
+            model=model,
+            rate_limit_rpm=500,  # OpenAI Tier 1: 500 req/min for gpt-4o-mini
+        )
     elif model in OPENWEBUI_MODELS:
         if not _OPENWEBUI_KEY:
             raise ValueError(
@@ -152,10 +187,7 @@ def get_provider_config(model: str) -> ProviderConfig:
             rate_limit_rpm=0,  # University cluster: no explicit rate limit
         )
     else:
-        raise ValueError(
-            f"Unknown model: '{model}'. "
-            f"Known models: {', '.join(ALL_MODELS)}"
-        )
+        raise ValueError(f"Unknown model: '{model}'. " f"Known models: {', '.join(ALL_MODELS)}")
 
 
 def is_lmstudio_model(model: str) -> bool:
@@ -166,6 +198,7 @@ def is_lmstudio_model(model: str) -> bool:
 # =============================================================================
 # Rate limiter (thread-safe, per-provider)
 # =============================================================================
+
 
 class _RateLimiter:
     """
@@ -186,7 +219,7 @@ class _RateLimiter:
             return  # No limit
 
         window = 60.0  # 1 minute
-        min_interval = window / rpm
+        _min_interval = window / rpm  # noqa: F841
 
         with self._lock:
             now = time.time()
@@ -195,9 +228,7 @@ class _RateLimiter:
 
             # Prune old timestamps outside the window
             cutoff = now - window
-            self._calls[provider] = [
-                t for t in self._calls[provider] if t > cutoff
-            ]
+            self._calls[provider] = [t for t in self._calls[provider] if t > cutoff]
 
             if len(self._calls[provider]) >= rpm:
                 # Must wait until the oldest call in the window expires
@@ -219,6 +250,7 @@ _rate_limiter = _RateLimiter()
 # =============================================================================
 # Unified LLM call function
 # =============================================================================
+
 
 def call_llm(
     messages: List[Dict[str, Any]],

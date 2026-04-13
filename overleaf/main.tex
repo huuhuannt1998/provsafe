@@ -1,10 +1,10 @@
-\documentclass[journal]{IEEEtran}
+\documentclass[sigconf,anonymous]{acmart}
 
-\title{PROVSAFE: Provenance-Gated Policy Enforcement\\for Tool-Using LLM Agents}
+\title{PROVSAFE: Provenance-Gated Policy Enforcement for Tool-Using LLM Agents}
 
-\author{
-\IEEEauthorblockN{Anonymous Author(s)}
-\IEEEauthorblockA{Anonymous Institution}
+\author{Anonymous Author(s)}
+\affiliation{%
+  \institution{Anonymous Institution}
 }
 
 % ── Packages ──────────────────────────────────────────────────────────────────
@@ -16,34 +16,24 @@
 \usepackage{enumitem}
 \let\Bbbk\relax
 \usepackage{amsmath,amssymb,mathtools}
-\usepackage[hypertexnames=false]{hyperref}
-\usepackage{cleveref}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{pifont}
 \newcommand{\cmark}{\ding{51}}
 \newcommand{\xmark}{\ding{55}}
-\usepackage{float}
-\usepackage{cite}
-\usepackage{url}
-\usepackage{color}
-\usepackage{multirow}
 
-% Reduce line-breaking badbox diagnostics under IEEE two-column constraints
+% Reduce line-breaking badbox diagnostics
 \emergencystretch=2em
 \hfuzz=50pt
 \hbadness=10000
 \vbadness=10000
-\AtBeginDocument{\sloppy\hfuzz=100pt\hbadness=10000\vbadness=10000}
 
 \newtheorem{property}{Property}
-\newtheorem{theorem}{Theorem}
-\newenvironment{proof}[1][Proof]{\noindent\textbf{#1.}\itshape}{\hfill$\square$\par\medskip}
 
 \newcommand{\tool}{\textnormal{\textsc{ProVSafe}}}
 \newcommand{\sys}{\tool}
 
-% Compact lists for IEEE format
+% Compact lists
 \setlist[itemize]{leftmargin=1.2em, topsep=2pt, itemsep=1pt}
 \setlist[enumerate]{leftmargin=1.5em, topsep=2pt, itemsep=1pt}
 
@@ -52,14 +42,34 @@
 \maketitle
 
 \begin{abstract}
-Tool-using LLM agents are vulnerable to prompt injection attacks in which adversaries embed malicious instructions in content the agent processes alongside legitimate commands. Existing defenses lack a fundamental primitive: \emph{data provenance}---without tracking where each tool-call argument originated, no defense can distinguish user-initiated operations from attacker-injected ones.
-
-We present \sys{}, a provenance-gated policy enforcement framework for tool-using LLM agents. \sys{} maintains a W3C PROV-DM--grounded provenance DAG with a two-element trust lattice, resolves each argument's origin through a three-stage pipeline (substring matching, sentence-embedding similarity, conservative default), and evaluates declarative policies at the tool-call boundary. Across 24{,}240 trials (200+ scenarios, five LLMs spanning 3B--122B parameters, five systems, five repetitions), \sys{} achieves \textbf{1.09\% $\pm$ 0.36} attack success rate (ASR-IA) with \textbf{95.00\% $\pm$ 1.52} task success rate---a 24$\times$ reduction versus no defense, while a Taint-Everything baseline achieves 0.00\% ASR but collapses to 9.00\% TSR (unusable). On the external InjecAgent benchmark (1{,}054 cases), policy enforcement \emph{without} provenance achieves 22.67\% ASR---no better than no defense---while \sys{} reduces ASR to \textbf{4.12\%}, confirming provenance is essential when attacker tools are not syntactically distinguishable from legitimate ones.
+Tool-using LLM agents are vulnerable to prompt injection attacks where adversaries embed malicious instructions in content the agent processes. Existing defenses lack a fundamental primitive: \emph{data provenance}---without tracking where each tool-call argument originated, no defense can distinguish user-initiated operations from attacker-injected ones. We present \sys{}, a provenance-gated policy enforcement framework that maintains a W3C PROV-DM--grounded provenance DAG with a two-element trust lattice, resolves each argument's origin through a three-stage pipeline, and evaluates declarative policies at the tool-call boundary. Across \textbf{26{,}500+ trials} spanning five LLMs (five vendor families, including GPT-4o-mini), five defense systems, and five repetitions, \sys{} achieves \textbf{1.02\% ASR-IA} with \textbf{95\% task success}---a 24$\times$ reduction versus no defense. On the external InjecAgent benchmark (1{,}054 cases $\times$ 5 models $\times$ 3 reps), policy enforcement \emph{without} provenance reduces ASR to 12.34\% but still fails on data-stealing attacks (21.7\%), while \sys{} reduces ASR to \textbf{4.22\%}---a 6.1$\times$ reduction---confirming provenance is essential when attacker tools are syntactically indistinguishable from legitimate ones. An iterative multi-pass decoder achieves 100\% detection on 36 encoding robustness vectors, and an expanded adaptive adversary evaluation (50 white-box attack scenarios, 180 LLM trials) confirms 100\% blocking---no adaptive attack bypasses the provenance mechanism.
 \end{abstract}
 
-\begin{IEEEkeywords}
-LLM Agents, Prompt Injection, Data Provenance, Capability Security, Policy Enforcement, Tool-Call Security
-\end{IEEEkeywords}
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10002978.10003029.10011703</concept_id>
+<concept_desc>Security and privacy~Intrusion/anomaly detection and malware mitigation</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10002978.10003014.10003017</concept_id>
+<concept_desc>Security and privacy~Access control</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10010147.10010257.10010258.10010259.10010263</concept_id>
+<concept_desc>Computing methodologies~Transfer learning</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Security and privacy~Intrusion/anomaly detection and malware mitigation}
+\ccsdesc[500]{Security and privacy~Access control}
+\ccsdesc[300]{Computing methodologies~Transfer learning}
+
+\keywords{LLM Agents, Prompt Injection, Data Provenance, Capability Security, Policy Enforcement, Tool-Call Security}
 
 \input{sections/01_intro}
 \input{sections/02_background}
@@ -73,13 +83,15 @@ LLM Agents, Prompt Injection, Data Provenance, Capability Security, Policy Enfor
 \input{sections/10_related_work}
 \input{sections/11_conclusion}
 
-\appendices
-\input{sections/appendix}
+\begin{acks}
+This work was partially supported by [funding agency]. The authors thank the reviewers for their constructive feedback.
+\end{acks}
 
-\section*{Acknowledgment}
-The authors thank the anonymous reviewers for their constructive feedback.
-
-\bibliographystyle{IEEEtran}
+\bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
+
+\newpage
+\appendix
+\input{sections/appendix}
 
 \end{document}

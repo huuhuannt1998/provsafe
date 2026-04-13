@@ -28,22 +28,25 @@ logger = logging.getLogger(__name__)
 
 class PolicyDecision(Enum):
     """Policy evaluation decisions."""
-    ALLOW = "allow"              # Execute without confirmation
-    DENY = "deny"                # Block execution
+
+    ALLOW = "allow"  # Execute without confirmation
+    DENY = "deny"  # Block execution
     REQUIRE_CONFIRMATION = "require_confirmation"  # Ask user
 
 
 class RiskTier(Enum):
     """Tool risk tiers."""
-    LOW = "low"          # Read-only, minimal impact
-    MEDIUM = "medium"    # Write operations, moderate impact
-    HIGH = "high"        # Destructive operations, high impact
+
+    LOW = "low"  # Read-only, minimal impact
+    MEDIUM = "medium"  # Write operations, moderate impact
+    HIGH = "high"  # Destructive operations, high impact
     CRITICAL = "critical"  # System-level, irreversible
 
 
 @dataclass
 class PolicyRule:
     """A single policy rule."""
+
     name: str
     priority: int  # Lower = higher priority
     conditions: List[Dict[str, Any]]
@@ -78,7 +81,12 @@ class PolicyRule:
 
         elif cond_type == "risk_tier_min":
             # Matches if risk tier is >= the specified minimum
-            tier_order = {RiskTier.LOW: 0, RiskTier.MEDIUM: 1, RiskTier.HIGH: 2, RiskTier.CRITICAL: 3}
+            tier_order = {
+                RiskTier.LOW: 0,
+                RiskTier.MEDIUM: 1,
+                RiskTier.HIGH: 2,
+                RiskTier.CRITICAL: 3,
+            }
             ctx_tier = context.get("risk_tier", RiskTier.MEDIUM)
             min_tier = condition.get("value", RiskTier.MEDIUM)
             return tier_order.get(ctx_tier, 1) >= tier_order.get(min_tier, 1)
@@ -145,7 +153,10 @@ class PolicyRule:
             # Write to sensitive locations
             if action == "write":
                 path = tool_args.get("path", "")
-                if any(sensitive in path for sensitive in ["/etc", "/sys", "/root", ".ssh", "authorized_keys"]):
+                if any(
+                    sensitive in path
+                    for sensitive in ["/etc", "/sys", "/root", ".ssh", "authorized_keys"]
+                ):
                     return True
 
             return False
@@ -169,6 +180,7 @@ class PolicyRule:
 @dataclass
 class PolicyEvaluationResult:
     """Result of policy evaluation."""
+
     decision: PolicyDecision
     matched_rule: Optional[PolicyRule]
     reason: str
@@ -192,10 +204,7 @@ class RateTracker:
         cutoff_time = current_time - window_seconds
 
         # Remove old calls outside window
-        self.call_history[tool_name] = [
-            t for t in self.call_history[tool_name]
-            if t > cutoff_time
-        ]
+        self.call_history[tool_name] = [t for t in self.call_history[tool_name] if t > cutoff_time]
 
         # Check if adding one more call would exceed limit
         return len(self.call_history[tool_name]) < max_calls
@@ -253,7 +262,7 @@ class PolicyEngine:
         """
         import yaml
 
-        with open(policy_file, 'r') as f:
+        with open(policy_file, "r") as f:
             policy_data = yaml.safe_load(f)
 
         self.policy_name = policy_data.get("name", "unnamed")
@@ -262,19 +271,21 @@ class PolicyEngine:
         # Load global rate limit
         global_rl = policy_data.get("global_rate_limit")
         if global_rl and not self.config.get("disable_rate_limiting", False):
-            self.rules.append(PolicyRule(
-                name="global_rate_limit",
-                priority=0,
-                conditions=[
-                    {
-                        "type": "rate_limit_exceeded",
-                        "max_calls": global_rl["max_calls"],
-                        "window_seconds": global_rl["window_seconds"],
-                    },
-                ],
-                decision=PolicyDecision.DENY,
-                reason="Global rate limit exceeded",
-            ))
+            self.rules.append(
+                PolicyRule(
+                    name="global_rate_limit",
+                    priority=0,
+                    conditions=[
+                        {
+                            "type": "rate_limit_exceeded",
+                            "max_calls": global_rl["max_calls"],
+                            "window_seconds": global_rl["window_seconds"],
+                        },
+                    ],
+                    decision=PolicyDecision.DENY,
+                    reason="Global rate limit exceeded",
+                )
+            )
 
         # Load rules
         yaml_rules = policy_data.get("rules", [])
@@ -296,11 +307,13 @@ class PolicyEngine:
 
             # Resource pattern condition (scope check)
             if "resource_pattern" in rule_def:
-                conditions.append({
-                    "type": "scope_allowed",
-                    "patterns": [rule_def["resource_pattern"]],
-                    "deny_patterns": [],
-                })
+                conditions.append(
+                    {
+                        "type": "scope_allowed",
+                        "patterns": [rule_def["resource_pattern"]],
+                        "deny_patterns": [],
+                    }
+                )
 
             # Determine decision
             if not rule_def.get("allow", True):
@@ -313,131 +326,150 @@ class PolicyEngine:
             # Per-rule rate limit
             if "rate_limit" in rule_def and not self.config.get("disable_rate_limiting", False):
                 rl = rule_def["rate_limit"]
-                conditions.append({
-                    "type": "rate_limit_exceeded",
-                    "max_calls": rl["max_calls"],
-                    "window_seconds": rl["window_seconds"],
-                })
+                conditions.append(
+                    {
+                        "type": "rate_limit_exceeded",
+                        "max_calls": rl["max_calls"],
+                        "window_seconds": rl["window_seconds"],
+                    }
+                )
                 # If rate limit exceeded, override decision to DENY
                 # Create a separate rate-limit deny rule with higher priority
-                self.rules.append(PolicyRule(
-                    name=f"{rule_def['name']}_rate_limit",
-                    priority=idx + 1,
-                    conditions=[
-                        {"type": "tool_name", "value": rule_def.get("tool", "*")},
-                        {
-                            "type": "rate_limit_exceeded",
-                            "max_calls": rl["max_calls"],
-                            "window_seconds": rl["window_seconds"],
-                        },
-                    ],
-                    decision=PolicyDecision.DENY,
-                    reason=f"Rate limit exceeded for {rule_def['name']}",
-                ))
+                self.rules.append(
+                    PolicyRule(
+                        name=f"{rule_def['name']}_rate_limit",
+                        priority=idx + 1,
+                        conditions=[
+                            {"type": "tool_name", "value": rule_def.get("tool", "*")},
+                            {
+                                "type": "rate_limit_exceeded",
+                                "max_calls": rl["max_calls"],
+                                "window_seconds": rl["window_seconds"],
+                            },
+                        ],
+                        decision=PolicyDecision.DENY,
+                        reason=f"Rate limit exceeded for {rule_def['name']}",
+                    )
+                )
 
-            self.rules.append(PolicyRule(
-                name=rule_def["name"],
-                priority=100 + idx,  # YAML rules after rate-limit rules
-                conditions=conditions,
-                decision=decision,
-                reason=rule_def.get("description", rule_def["name"]),
-            ))
+            self.rules.append(
+                PolicyRule(
+                    name=rule_def["name"],
+                    priority=100 + idx,  # YAML rules after rate-limit rules
+                    conditions=conditions,
+                    decision=decision,
+                    reason=rule_def.get("description", rule_def["name"]),
+                )
+            )
 
         logger.info(
             "Loaded %d rules from %s (policy: %s)",
-            len(self.rules), policy_file, self.policy_name,
+            len(self.rules),
+            policy_file,
+            self.policy_name,
         )
 
     def _load_default_rules(self):
         """Load built-in default policy rules."""
         # Rule 1: DENY critical operations with untrusted args
-        self.rules.append(PolicyRule(
-            name="deny_critical_untrusted",
-            priority=1,
-            conditions=[
-                {"type": "risk_tier", "value": RiskTier.CRITICAL},
-                {"type": "has_untrusted_args", "value": True},
-            ],
-            decision=PolicyDecision.DENY,
-            reason="CRITICAL operation with untrusted arguments blocked",
-        ))
+        self.rules.append(
+            PolicyRule(
+                name="deny_critical_untrusted",
+                priority=1,
+                conditions=[
+                    {"type": "risk_tier", "value": RiskTier.CRITICAL},
+                    {"type": "has_untrusted_args", "value": True},
+                ],
+                decision=PolicyDecision.DENY,
+                reason="CRITICAL operation with untrusted arguments blocked",
+            )
+        )
 
         # Rule 2: DENY HIGH-risk operations with untrusted args outside allowed scope
-        self.rules.append(PolicyRule(
-            name="deny_high_untrusted_outscope",
-            priority=2,
-            conditions=[
-                {"type": "risk_tier", "value": RiskTier.HIGH},
-                {"type": "has_untrusted_args", "value": True},
-                {"type": "scope_allowed", "patterns": [], "deny_patterns": []},
-            ],
-            decision=PolicyDecision.DENY,
-            reason="HIGH-risk operation with untrusted arguments outside allowed scope",
-        ))
+        self.rules.append(
+            PolicyRule(
+                name="deny_high_untrusted_outscope",
+                priority=2,
+                conditions=[
+                    {"type": "risk_tier", "value": RiskTier.HIGH},
+                    {"type": "has_untrusted_args", "value": True},
+                    {"type": "scope_allowed", "patterns": [], "deny_patterns": []},
+                ],
+                decision=PolicyDecision.DENY,
+                reason="HIGH-risk operation with untrusted arguments outside allowed scope",
+            )
+        )
 
         # Rule 3: REQUIRE_CONFIRMATION for HIGH-risk with untrusted args in allowed scope
-        self.rules.append(PolicyRule(
-            name="confirm_high_untrusted",
-            priority=3,
-            conditions=[
-                {"type": "risk_tier", "value": RiskTier.HIGH},
-                {"type": "has_untrusted_args", "value": True},
-            ],
-            decision=PolicyDecision.REQUIRE_CONFIRMATION,
-            reason="HIGH-risk operation with untrusted arguments requires confirmation",
-        ))
+        self.rules.append(
+            PolicyRule(
+                name="confirm_high_untrusted",
+                priority=3,
+                conditions=[
+                    {"type": "risk_tier", "value": RiskTier.HIGH},
+                    {"type": "has_untrusted_args", "value": True},
+                ],
+                decision=PolicyDecision.REQUIRE_CONFIRMATION,
+                reason="HIGH-risk operation with untrusted arguments requires confirmation",
+            )
+        )
 
         # Rule 4: REQUIRE_CONFIRMATION for MEDIUM-risk with untrusted args
-        self.rules.append(PolicyRule(
-            name="confirm_medium_untrusted",
-            priority=4,
-            conditions=[
-                {"type": "risk_tier", "value": RiskTier.MEDIUM},
-                {"type": "has_untrusted_args", "value": True},
-            ],
-            decision=PolicyDecision.REQUIRE_CONFIRMATION,
-            reason="MEDIUM-risk operation with untrusted arguments requires confirmation",
-        ))
+        self.rules.append(
+            PolicyRule(
+                name="confirm_medium_untrusted",
+                priority=4,
+                conditions=[
+                    {"type": "risk_tier", "value": RiskTier.MEDIUM},
+                    {"type": "has_untrusted_args", "value": True},
+                ],
+                decision=PolicyDecision.REQUIRE_CONFIRMATION,
+                reason="MEDIUM-risk operation with untrusted arguments requires confirmation",
+            )
+        )
 
         # Rule 5: DENY if rate limit exceeded
         if not self.config.get("disable_rate_limiting", False):
-            self.rules.append(PolicyRule(
-                name="deny_rate_limit",
-                priority=5,
-                conditions=[
-                    {"type": "rate_limit_exceeded", "max_calls": 10, "window_seconds": 60},
-                ],
-                decision=PolicyDecision.DENY,
-                reason="Rate limit exceeded",
-            ))
+            self.rules.append(
+                PolicyRule(
+                    name="deny_rate_limit",
+                    priority=5,
+                    conditions=[
+                        {"type": "rate_limit_exceeded", "max_calls": 10, "window_seconds": 60},
+                    ],
+                    decision=PolicyDecision.DENY,
+                    reason="Rate limit exceeded",
+                )
+            )
 
         # Rule 6: DENY dangerous actions regardless of provenance
-        self.rules.append(PolicyRule(
-            name="deny_dangerous_actions",
-            priority=6,
-            conditions=[
-                {"type": "dangerous_action", "value": True},
-            ],
-            decision=PolicyDecision.DENY,
-            reason="Inherently dangerous action blocked",
-        ))
+        self.rules.append(
+            PolicyRule(
+                name="deny_dangerous_actions",
+                priority=6,
+                conditions=[
+                    {"type": "dangerous_action", "value": True},
+                ],
+                decision=PolicyDecision.DENY,
+                reason="Inherently dangerous action blocked",
+            )
+        )
 
         # Rule 7: ALLOW LOW-risk operations
-        self.rules.append(PolicyRule(
-            name="allow_low_risk",
-            priority=10,
-            conditions=[
-                {"type": "risk_tier", "value": RiskTier.LOW},
-            ],
-            decision=PolicyDecision.ALLOW,
-            reason="LOW-risk operation allowed",
-        ))
+        self.rules.append(
+            PolicyRule(
+                name="allow_low_risk",
+                priority=10,
+                conditions=[
+                    {"type": "risk_tier", "value": RiskTier.LOW},
+                ],
+                decision=PolicyDecision.ALLOW,
+                reason="LOW-risk operation allowed",
+            )
+        )
 
     def evaluate(
-        self,
-        tool_name: str,
-        tool_args: Dict[str, Any],
-        provenance_info: Dict[str, Any]
+        self, tool_name: str, tool_args: Dict[str, Any], provenance_info: Dict[str, Any]
     ) -> PolicyEvaluationResult:
         """
         Evaluate policy for a tool call.
@@ -488,7 +520,7 @@ class PolicyEngine:
                         "untrusted_args": context["untrusted_arg_names"],
                         "resource_path": resource_path,
                         "latency_ms": latency_ms,
-                    }
+                    },
                 )
 
         # Default: respect policy's default_allow; deny-by-default when false (loaded from YAML).
@@ -511,7 +543,7 @@ class PolicyEngine:
                 "risk_tier": risk_tier.value,
                 "has_untrusted_args": context["has_untrusted_args"],
                 "latency_ms": latency_ms,
-            }
+            },
         )
 
     def _get_risk_tier(self, tool_name: str) -> RiskTier:

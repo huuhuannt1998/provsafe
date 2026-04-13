@@ -1,0 +1,103 @@
+{
+  "benchmark": "InjecAgent",
+  "settings": [
+    "base"
+  ],
+  "n_cases": 1054,
+  "models": [
+    "gpt-4o-mini"
+  ],
+  "systems": [
+    "no_defense",
+    "pattern_filter",
+    "policy_only",
+    "taint_everything",
+    "provsafe"
+  ],
+  "reps": 3,
+  "total_trials": 15810,
+  "aggregate": {
+    "no_defense": {
+      "asr_ia_mean": 2.53,
+      "asr_ia_ci_half": 0.55,
+      "n_trials": 3162,
+      "n_successes": 80
+    },
+    "pattern_filter": {
+      "asr_ia_mean": 2.8147,
+      "asr_ia_ci_half": 0.58,
+      "n_trials": 3162,
+      "n_successes": 89
+    },
+    "policy_only": {
+      "asr_ia_mean": 2.0557,
+      "asr_ia_ci_half": 0.5,
+      "n_trials": 3162,
+      "n_successes": 65
+    },
+    "taint_everything": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.06,
+      "n_trials": 3162,
+      "n_successes": 0
+    },
+    "provsafe": {
+      "asr_ia_mean": 1.1701,
+      "asr_ia_ci_half": 0.38,
+      "n_trials": 3162,
+      "n_successes": 37
+    }
+  },
+  "per_attack_type": {
+    "no_defense_dh": {
+      "asr_ia_mean": 0.1961,
+      "asr_ia_ci_half": 0.25,
+      "n": 1530
+    },
+    "no_defense_ds": {
+      "asr_ia_mean": 4.7181,
+      "asr_ia_ci_half": 1.03,
+      "n": 1632
+    },
+    "pattern_filter_dh": {
+      "asr_ia_mean": 0.3268,
+      "asr_ia_ci_half": 0.31,
+      "n": 1530
+    },
+    "pattern_filter_ds": {
+      "asr_ia_mean": 5.1471,
+      "asr_ia_ci_half": 1.08,
+      "n": 1632
+    },
+    "policy_only_dh": {
+      "asr_ia_mean": 0.0654,
+      "asr_ia_ci_half": 0.18,
+      "n": 1530
+    },
+    "policy_only_ds": {
+      "asr_ia_mean": 3.9216,
+      "asr_ia_ci_half": 0.95,
+      "n": 1632
+    },
+    "taint_everything_dh": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.13,
+      "n": 1530
+    },
+    "taint_everything_ds": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.12,
+      "n": 1632
+    },
+    "provsafe_dh": {
+      "asr_ia_mean": 0.0,
+      "asr_ia_ci_half": 0.13,
+      "n": 1530
+    },
+    "provsafe_ds": {
+      "asr_ia_mean": 2.2672,
+      "asr_ia_ci_half": 0.73,
+      "n": 1632
+    }
+  }
+}

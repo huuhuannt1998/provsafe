@@ -17,18 +17,15 @@ Usage:
 import argparse
 import json
 import sys
-import os
-import time
 import random
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 # Add project root
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "evaluation"))
 
-from model_providers import call_llm, ALL_MODELS, GROQ_MODELS, GEMINI_MODELS
-
+from model_providers import call_llm
 
 # ── Judge prompt ────────────────────────────────────────────────────────────
 
@@ -174,9 +171,7 @@ def judge_trial(
         }
 
 
-def compute_cohens_kappa(
-    heuristic_labels: List[str], judge_labels: List[str]
-) -> float:
+def compute_cohens_kappa(heuristic_labels: List[str], judge_labels: List[str]) -> float:
     """
     Compute Cohen's kappa between heuristic and judge binary classifications.
 
@@ -187,8 +182,8 @@ def compute_cohens_kappa(
     if n == 0:
         return 0.0
 
-    h = [1 if l == "ATTACK_SUCCESS" else 0 for l in heuristic_labels]
-    j = [1 if l == "ATTACK_SUCCESS" else 0 for l in judge_labels]
+    h = [1 if label == "ATTACK_SUCCESS" else 0 for label in heuristic_labels]
+    j = [1 if label == "ATTACK_SUCCESS" else 0 for label in judge_labels]
 
     # Observed agreement
     agree = sum(1 for a, b in zip(h, j) if a == b)
@@ -206,9 +201,7 @@ def compute_cohens_kappa(
     return kappa
 
 
-def sample_trials(
-    results: List[Dict], n_sample: int, seed: int = 42
-) -> List[Dict]:
+def sample_trials(results: List[Dict], n_sample: int, seed: int = 42) -> List[Dict]:
     """
     Stratified sample: half from attack trials, half from benign trials.
     Within attacks, oversample those flagged as attack_success by heuristic.
@@ -261,9 +254,7 @@ def main():
         default=str(REPO / "evaluation" / "scenarios_expanded.json"),
         help="Path to scenario definitions",
     )
-    parser.add_argument(
-        "--sample", type=int, default=200, help="Number of trials to judge"
-    )
+    parser.add_argument("--sample", type=int, default=200, help="Number of trials to judge")
     parser.add_argument(
         "--judge-model",
         type=str,
@@ -307,7 +298,9 @@ def main():
     print(f"Sampled {len(sampled)} trials for judging")
     print(f"  - Attacks: {sum(1 for r in sampled if r.get('scenario_type') == 'attack')}")
     print(f"  - Benign: {sum(1 for r in sampled if r.get('scenario_type') == 'benign')}")
-    print(f"  - Heuristic attack_success=True: {sum(1 for r in sampled if r.get('attack_success'))}")
+    print(
+        f"  - Heuristic attack_success=True: {sum(1 for r in sampled if r.get('attack_success'))}"
+    )
 
     # Judge each trial
     print(f"\nJudging with {args.judge_model}...")
@@ -332,33 +325,35 @@ def main():
         heuristic_labels.append(h_label)
         judge_labels.append(result["judge_label"])
 
-        judge_results.append({
-            "trial_index": i,
-            "scenario_id": scenario_id,
-            "scenario_type": trial.get("scenario_type"),
-            "system": trial.get("system"),
-            "model": trial.get("model"),
-            "heuristic_label": h_label,
-            "judge_label": result["judge_label"],
-            "justification": result["justification"],
-            "agree": h_label == result["judge_label"],
-        })
+        judge_results.append(
+            {
+                "trial_index": i,
+                "scenario_id": scenario_id,
+                "scenario_type": trial.get("scenario_type"),
+                "system": trial.get("system"),
+                "model": trial.get("model"),
+                "heuristic_label": h_label,
+                "judge_label": result["judge_label"],
+                "justification": result["justification"],
+                "agree": h_label == result["judge_label"],
+            }
+        )
 
         if (i + 1) % 10 == 0:
             agree_so_far = sum(1 for r in judge_results if r["agree"])
-            print(f"  [{i+1}/{len(sampled)}] Agreement: {agree_so_far}/{i+1} ({100*agree_so_far/(i+1):.1f}%)")
+            print(
+                f"  [{i+1}/{len(sampled)}] Agreement: {agree_so_far}/{i+1} ({100*agree_so_far/(i+1):.1f}%)"
+            )
 
     # Compute agreement metrics
     n_total = len(judge_results)
     n_agree = sum(1 for r in judge_results if r["agree"])
-    n_error = sum(1 for l in judge_labels if l == "ERROR")
-    n_uncertain = sum(1 for l in judge_labels if l == "UNCERTAIN")
+    n_error = sum(1 for label in judge_labels if label == "ERROR")
+    n_uncertain = sum(1 for label in judge_labels if label == "UNCERTAIN")
 
     # Filter out errors/uncertain for kappa
     valid_pairs = [
-        (h, j)
-        for h, j in zip(heuristic_labels, judge_labels)
-        if j not in ("ERROR", "UNCERTAIN")
+        (h, j) for h, j in zip(heuristic_labels, judge_labels) if j not in ("ERROR", "UNCERTAIN")
     ]
     valid_h = [p[0] for p in valid_pairs]
     valid_j = [p[1] for p in valid_pairs]
@@ -370,9 +365,7 @@ def main():
     for h in labels:
         confusion[h] = {}
         for j in labels:
-            confusion[h][j] = sum(
-                1 for hr, jr in zip(valid_h, valid_j) if hr == h and jr == j
-            )
+            confusion[h][j] = sum(1 for hr, jr in zip(valid_h, valid_j) if hr == h and jr == j)
 
     # Report
     report = {
@@ -385,12 +378,17 @@ def main():
         "n_uncertain": n_uncertain,
         "cohens_kappa": round(kappa, 4),
         "kappa_interpretation": (
-            "almost perfect" if kappa > 0.81
-            else "substantial" if kappa > 0.61
-            else "moderate" if kappa > 0.41
-            else "fair" if kappa > 0.21
-            else "slight" if kappa > 0.0
-            else "poor"
+            "almost perfect"
+            if kappa > 0.81
+            else (
+                "substantial"
+                if kappa > 0.61
+                else (
+                    "moderate"
+                    if kappa > 0.41
+                    else "fair" if kappa > 0.21 else "slight" if kappa > 0.0 else "poor"
+                )
+            )
         ),
         "confusion_matrix": confusion,
         "details": judge_results,
@@ -411,7 +409,7 @@ def main():
     print(f"Errors/uncertain:   {n_error + n_uncertain}")
     print(f"Raw agreement:      {n_agree}/{n_total} ({100*n_agree/max(n_total,1):.1f}%)")
     print(f"Cohen's kappa:      {kappa:.4f} ({report['kappa_interpretation']})")
-    print(f"\nConfusion matrix (heuristic × judge):")
+    print("\nConfusion matrix (heuristic × judge):")
     print(f"{'':>20} {'ATTACK_SUCCESS':>16} {'ATTACK_FAILED':>16} {'BENIGN':>10}")
     for h in labels:
         row = [confusion[h].get(j, 0) for j in labels]

@@ -16,13 +16,9 @@ load_dotenv()
 
 # OpenWebUI API Configuration
 OPENWEBUI_URL = os.getenv(
-    "OPENWEBUI_URL",
-    "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions"
+    "OPENWEBUI_URL", "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions"
 )
-OPENWEBUI_API_KEY = os.getenv(
-    "OPENWEBUI_API_KEY",
-    "sk-a6af2053d49649d2925ff91fef71cb65"
-)
+OPENWEBUI_API_KEY = os.getenv("OPENWEBUI_API_KEY", "sk-a6af2053d49649d2925ff91fef71cb65")
 
 # LLM Models for Agent and Oracle
 AGENT_MODELS = [
@@ -49,14 +45,14 @@ SMARTTHINGS_TOKEN = os.getenv("SMARTTHINGS_TOKEN", "")
 
 # Available SmartThings capabilities
 ST_CAPABILITIES = [
-    "switch",                    # On/off devices
-    "switchLevel",              # Dimmable lights
-    "temperatureMeasurement",   # Temperature sensors
-    "contactSensor",            # Door/window sensors
-    "motionSensor",             # Motion detectors
-    "lock",                     # Smart locks
-    "thermostatMode",           # Thermostat
-    "notification",             # Notifications
+    "switch",  # On/off devices
+    "switchLevel",  # Dimmable lights
+    "temperatureMeasurement",  # Temperature sensors
+    "contactSensor",  # Door/window sensors
+    "motionSensor",  # Motion detectors
+    "lock",  # Smart locks
+    "thermostatMode",  # Thermostat
+    "notification",  # Notifications
 ]
 
 # =============================================================================

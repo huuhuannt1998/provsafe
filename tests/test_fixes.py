@@ -2,10 +2,7 @@
 argument validation pipeline, provenance graph cycle detection, and
 empty-sources trust default."""
 
-import json
-import os
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -17,14 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.policy_engine import (
     PolicyDecision,
     PolicyEngine,
-    PolicyEvaluationResult,
-    PolicyRule,
-    RateTracker,
-    RiskTier,
 )
 from src.provenance_graph import ProvenanceGraph, TrustLabel, trust_meet
 from src.enforcement_proxy import EnforcementProxy
-
 
 # =============================================================================
 # Policy Engine: Rate Limit Bug Fix
@@ -278,7 +270,7 @@ class TestCycleDetection:
         user_id = graph.add_user_input("hello")
         tool_id = graph.add_tool_result("api", "data")
         llm_id = graph.add_llm_generation("response", [user_id, tool_id])
-        call_id = graph.add_tool_call("test_tool", {"action": "read"}, llm_id)
+        _call_id = graph.add_tool_call("test_tool", {"action": "read"}, llm_id)
 
         # All operations succeed without ValueError
         assert len(graph.nodes) == 4
