@@ -2,57 +2,55 @@
 \label{sec:related}
 
 \paragraph{Prompt Injection Attacks.}
-Perez et al.~\cite{perez2022ignore} first showed LLMs cannot reliably separate instructions from data; Greshake et al.~\cite{greshake2023not} extended this to \emph{indirect} injection via external content. Tensor Trust~\cite{tensortrust2024} quantified injection robustness through an adversarial game, revealing systematic weaknesses across models. HijackRAG~\cite{hijackrag2025} demonstrates that retrieval-augmented systems are particularly vulnerable when injected content reaches the context window via external documents. Benchmarks including InjecAgent~\cite{injecagent2024}, AgentDojo~\cite{agentdojo2024}, and CyberSecEval~\cite{cyberseceval2024} provide standardized evaluation, and OWASP~\cite{owasp-llm2025} now ranks prompt injection as the top LLM risk.
+Perez et al.~\cite{perez2022ignore} first showed LLMs cannot reliably separate instructions from data; Greshake et al.~\cite{greshake2023not} extended this to \emph{indirect} injection via external content. Tensor Trust~\cite{tensortrust2024} quantified injection robustness through an adversarial game. HijackRAG~\cite{hijackrag2025} demonstrates that retrieval-augmented systems are particularly vulnerable. ToolHijacker~\cite{toolhijacker2026} shows tool-selection manipulation attacks against multiple defenses. Benchmarks including InjecAgent~\cite{injecagent2024}, AgentDojo~\cite{agentdojo2024}, ASB~\cite{asb2025}, and CyberSecEval~\cite{cyberseceval2024} provide standardized evaluation, and OWASP~\cite{owasp-llm2025} ranks prompt injection as the top LLM risk.
 
-\paragraph{Input Filtering and Guardrails.}
-Pattern filters (Rebuff~\cite{rebuff-defense}, LLM Guard~\cite{llm-guard}) and learned detectors (PromptGuard~\cite{prompt-guard}) achieve moderate detection rates but cannot distinguish trusted from untrusted arguments without provenance. Production guardrails (NeMo Guardrails~\cite{nemo-guardrails}) operate at the prompt level rather than the tool-call boundary.
+\paragraph{Filtering, Guardrails, and Training-Time Defenses.}
+Pattern filters (Rebuff~\cite{rebuff-defense}, LLM Guard~\cite{llm-guard}, PromptGuard~\cite{prompt-guard}) and prompt-level guardrails (NeMo~\cite{nemo-guardrails}, LangChain~\cite{langchain-guardrails}) achieve moderate detection but cannot distinguish trusted from untrusted arguments without provenance. Training-time interventions (StruQ~\cite{struq2024}, SecAlign~\cite{secalign2024}, Jatmo~\cite{jatmo2024}), instruction hierarchy~\cite{instruction-hierarchy2024}, and MELON~\cite{melon2025} (masked re-execution) are model-internal and cannot protect already-deployed models. IsolateGPT~\cite{isolategpt2025} provides execution isolation at the system level. AgentFuzz~\cite{agentfuzz2025} uses taint-style analysis for vulnerability \emph{detection} but not runtime enforcement. Spotlighting~\cite{spotlighting2024} reduces injection via prompt delimiters but provides no tool-call enforcement.
 
-\paragraph{Dual-LLM and Instruction Hierarchy.}
-Dual-LLM approaches (Robust Prompt~\cite{robust-prompt}, Self-Reminder~\cite{self-reminder}, Dual-Process~\cite{dual-llm-defense}) add cost or require retraining. StruQ~\cite{struq2024} and SecAlign~\cite{secalign2024} require training-time intervention; instruction hierarchy~\cite{instruction-hierarchy2024} requires fine-tuning; Jatmo~\cite{jatmo2024} fine-tunes task-specific models to ignore injected instructions but cannot generalize across tool ecosystems. All are model-internal and cannot protect already-deployed models; \sys{} enforces provenance externally without model modification.
+\paragraph{Provenance-Aware Tool-Call Enforcement.}
+The most relevant concurrent work shares \sys{}'s core insight: conditioning tool-call authorization on data lineage. We compare these systems honestly below.
 
-\paragraph{Output Validation and Sandboxing.}
-LangChain Guardrails~\cite{langchain-guardrails} validate tool calls but make context-free decisions; least-privilege sandboxing is too coarse for agents needing conditional access. \sys{}'s provenance-aware policies allow or deny the same tool call depending on argument origin.
+\emph{CaMeL}~\cite{camel2025} (Google DeepMind, March 2025) maintains a full data-flow graph where each variable carries capability metadata specifying origin and access rights; a custom Python interpreter recursively traverses the entire dependency graph before every tool call. In STRICT mode, even implicit information flows through conditionals are tracked. Enforcement is deterministic: pure Python policy functions return \texttt{Allowed()} or \texttt{Denied(reason)} with no LLM in the loop, achieving 0\% ASR on AgentDojo~\cite{agentdojo2024}. CaMeL's \emph{structural isolation} (dual-LLM architecture with Privileged and Quarantined LLMs) prevents untrusted data from reaching the planner, making paraphrase resilience unnecessary. The tradeoff is reduced utility (48--77\% task completion~\cite{opcamel2025,agentarmor2025}) and a requirement for custom interpreter infrastructure.
 
-\paragraph{LLM Agent Security.}
-Tool-augmented LLMs~\cite{schick2023toolformer,talm} and autonomous agents (AutoGPT~\cite{autogpt}) amplify injection risks; InjecAgent~\cite{injecagent2024} reports 24\% vulnerability for GPT-4. ToolEmu~\cite{toolemu2024} emulates tool execution for safety evaluation but provides no runtime enforcement.
+\emph{FIDES}~\cite{fides2025} (Microsoft Research, May 2025) implements formal information-flow control with dynamic taint-tracking of integrity and confidentiality labels through a lattice model---remarkably similar to \sys{}'s two-element trust lattice. FIDES provides formal noninterference proofs and achieves 0\% policy-violating injections on AgentDojo. Like CaMeL, FIDES relies on structural separation of trusted and untrusted data flows.
+
+\emph{PCAS}~\cite{pcas2026} (February 2026) models the system state as a dependency graph capturing causal relationships among tool calls, results, and messages. A Datalog-derived declarative policy language and reference monitor intercept all actions before execution---architecturally closest to \sys{}'s YAML-policy-plus-sidecar approach. PCAS tracks transitive information flow but does not address LLM paraphrasing.
+
+\emph{ARM}~\cite{arm2026} (April 2026) implements a provenance graph with field-level tracking, an integrity lattice, and sidecar proxy enforcement. ARM extends the paradigm by modeling denied actions as first-class provenance events with counterfactual edges, addressing ``causality laundering'' attacks where adversaries chain denied-then-retried operations.
+
+\emph{Progent}~\cite{progent2025} (UC Berkeley, April 2025) provides a JSON-based DSL for privilege control with deterministic \texttt{SecureCall} wrappers at every tool invocation but does not track data provenance.
+
+Noureddine et al.~\cite{designpatterns2025} codify provenance-aware execution as one of six standard \emph{design patterns} for securing LLM agents, positioning the approach as established practice. PFI~\cite{pfi2025} separates trusted/untrusted agents with data proxies. Agent-Sentry~\cite{agentsentry2026} constructs functionality graphs from execution provenance for behavioral bounding. AgentArmor~\cite{agentarmor2025} achieves 72\% utility (vs.\ CaMeL's 48\%) with 3\% ASR.
 
 \paragraph{Data Provenance and Taint Tracking.}
-Why-provenance~\cite{buneman2001provenance}, the W3C PROV-DM standard~\cite{prov-dm}, dynamic taint analysis~\cite{taint-analysis-survey,taintdroid}, and DIFC systems~\cite{difc-survey,flume} provide foundational models. \sys{} adapts why-provenance to LLM agents with three key differences: opaque computation requiring boundary-level tracking, approximate resolution via embeddings for paraphrased content, and nuanced trust policies since agents must read untrusted data to function.
+Why-provenance~\cite{buneman2001provenance}, the W3C PROV-DM standard~\cite{prov-dm}, dynamic taint analysis~\cite{taint-analysis-survey,taintdroid}, and DIFC systems~\cite{difc-survey,flume} provide foundational models. PROV-AGENT~\cite{provagent2025} applies W3C PROV-DM to agentic workflows but for \emph{observability} only---not security enforcement. The ``Crossing NL/PL'' analysis~\cite{nlpldivide2026} characterizes information flow through LLM calls including paraphrasing, using taxonomy-based filtering rather than embeddings. DIPPER~\cite{dipper2023} demonstrates embedding-based retrieval to trace text through paraphrasing for AI-text detection---the closest technique to \sys{}'s resolution pipeline, applied in an adjacent domain.
 
 \paragraph{Capability-Based and IoT Security.}
 \sys{} adapts capability-based security~\cite{miller2006capability,capsicum} to LLM tool calls and extends context-aware IoT access control (ContextIoT~\cite{jia2017contexiot}, IoTGuard~\cite{iotguard}) with provenance tracking.
 
-\paragraph{Tool-Call-Level Enforcement.}
-Invariant~\cite{invariant2024} enforces formal security rules on agent actions via a domain-specific language, checking policy violations before execution. However, its rules operate on the tool call itself (tool name, arguments) without data-lineage context---it cannot distinguish the \emph{same} tool call originating from a trusted user command versus an attacker-injected payload; the authors do not report ASR on standard injection benchmarks, making direct numerical comparison infeasible. CaMeL~\cite{camel2025} applies causal mediation analysis to identify whether tool-call arguments were influenced by untrusted context but requires per-query causal tracing and does not provide deterministic enforcement. AgentMonitor~\cite{agentmonitor2025} tracks agent actions at runtime but provides monitoring rather than enforcement, alerting operators post-hoc rather than blocking malicious calls in real time. Spotlighting~\cite{spotlighting2024} reduces injection success by 85\% via prompt delimiters but provides no enforcement mechanism and does not handle tool-call arguments. \sys{} adds the missing provenance dimension: the DAG traces each argument to its source, enabling policies that condition on \emph{where arguments came from}, not just what they contain.
-
-\paragraph{Qualitative Comparison.}
-Table~\ref{tab:feature-comparison} compares \sys{} with representative defenses across a taxonomy of architectural features; we report features rather than numbers to avoid misleading cross-benchmark comparison.
+\paragraph{Positioning \sys{}.}
+Table~\ref{tab:feature-comparison} compares \sys{} with provenance-aware defenses. The distinguishing characteristics of \sys{} are: (1)~\emph{embedding-based provenance resolution}---no other security system uses sentence-embedding similarity for paraphrase-resilient provenance tracking, enabling enforcement without structural isolation; (2)~\emph{sidecar proxy deployment}---no model modification, no custom interpreter, framework-agnostic (shared with ARM but distinct from CaMeL, FIDES, PCAS); (3)~\emph{W3C PROV-DM grounding}---the only enforcement system using a standardized provenance model (PROV-AGENT uses W3C PROV for observability only). Systems based on structural isolation (CaMeL, FIDES) achieve stronger worst-case guarantees but sacrifice utility; \sys{} targets the complementary setting where strict isolation is impractical.
 
 \begin{table}[t]
 \centering
-\caption{Defense taxonomy. \cmark = supported, \xmark = not supported, $\sim$ = partial. Columns: \textbf{Enf.\ Point}: where the defense intercepts (P = prompt layer, T = tool-call boundary); \textbf{Lineage}: tracks data provenance; \textbf{Sem.}: handles semantic/paraphrase evasion; \textbf{Det.}: deterministic enforcement (not detection-only); \textbf{Indirect}: defends against indirect injection; \textbf{Burden}: user interaction cost (L = low/none, M = moderate, H = high).}
+\caption{Comparison with provenance-aware defenses. \textbf{Prov.}: provenance graph/DAG; \textbf{Trust}: integrity/trust propagation; \textbf{Det.}: deterministic enforcement; \textbf{Sem.}: paraphrase-resilient resolution; \textbf{Sidecar}: framework-agnostic external proxy; \textbf{Formal}: standards-based or formally verified model.}
 \label{tab:feature-comparison}
 \scriptsize
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
-\textbf{Defense} & \textbf{Enf.\ Point} & \textbf{Lineage} & \textbf{Sem.} & \textbf{Det.} & \textbf{Indirect} & \textbf{Burden} \\
+\textbf{System} & \textbf{Prov.} & \textbf{Trust} & \textbf{Det.} & \textbf{Sem.} & \textbf{Sidecar} & \textbf{Formal} \\
 \midrule
-Rebuff~\cite{rebuff-defense}         & P & \xmark & \xmark & \xmark & \xmark & L \\
-LLM Guard~\cite{llm-guard}           & P & \xmark & \xmark & \cmark & \xmark & L \\
-PromptGuard~\cite{prompt-guard}       & P & \xmark & $\sim$ & \xmark & \xmark & L \\
-Spotlighting~\cite{spotlighting2024}  & P & \xmark & \xmark & \xmark & $\sim$ & L \\
-NeMo~\cite{nemo-guardrails}           & P & \xmark & \xmark & \cmark & \xmark & L \\
-Invariant~\cite{invariant2024}        & T & \xmark & \xmark & \xmark & \cmark & L \\
-StruQ~\cite{struq2024}                & P & \xmark & \xmark & \xmark & \cmark & L \\
-Jatmo~\cite{jatmo2024}                & P & \xmark & $\sim$ & \xmark & \cmark & L \\
-CaMeL~\cite{camel2025}                & T & $\sim$ & \xmark & \xmark & \cmark & L \\
-ToolEmu~\cite{toolemu2024}            & T & \xmark & \xmark & \xmark & $\sim$ & L \\
+CaMeL~\cite{camel2025}         & \cmark & \cmark & \cmark & \xmark & \xmark & \xmark \\
+FIDES~\cite{fides2025}          & \cmark & \cmark & \cmark & \xmark & \xmark & \cmark$^\dag$ \\
+PCAS~\cite{pcas2026}            & \cmark & \cmark & \cmark & \xmark & \xmark & \xmark \\
+ARM~\cite{arm2026}              & \cmark & \cmark & \cmark & \xmark & \cmark & \xmark \\
+Progent~\cite{progent2025}      & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark \\
+Invariant~\cite{invariant2024}  & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark \\
 \midrule
-\textbf{\sys{} (Ours)}               & T & \cmark & \cmark & \cmark & \cmark & M \\
+\textbf{\sys{} (Ours)}         & \cmark & \cmark & \cmark & \cmark & \cmark & \cmark$^\ddag$ \\
 \bottomrule
+\multicolumn{7}{l}{\scriptsize $^\dag$Noninterference proofs. \quad $^\ddag$W3C PROV-DM standard.}
 \end{tabular}%
 }
 \end{table}
-
-\sys{} is, to our knowledge, the first system combining provenance-gated policies with deterministic enforcement at the tool-call boundary. Its REQUIRE\_CONFIRMATION mechanism introduces moderate user burden for high-risk calls with untrusted provenance (5\% FPR in our evaluation), a deliberate tradeoff for provenance-aware security. It is complementary to prompt-level guardrails as a defense-in-depth layer.

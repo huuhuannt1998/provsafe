@@ -48,12 +48,149 @@ Benign false positives & 40 & --- & Over-conservative \\
 
 \paragraph{Supplementary Material.} Detailed per-scenario results and per-model provenance accuracy breakdowns are available in the supplementary material. Additional content includes paraphrase-robustness analyses, adaptive-adversary scenario descriptions, benchmark distribution details, and policy-rule examples.
 
+\section{Adaptive Adversary Details (RQ7)}
+\label{sec:appendix-adaptive}
+
+Table~\ref{tab:adaptive} presents the full per-category results for the adaptive adversary evaluation described in Section~\ref{subsec:adaptive}.
+
+\begin{table}[htbp]
+\centering
+\caption{Adaptive adversary evaluation (60 scenarios: 50 attacks + 10 benign controls, 180 LLM trials with Llama-3.1-8B, 3 reps). Five white-box attack strategies.}
+\label{tab:adaptive}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Attack Strategy} & \textbf{N} & \textbf{Bypassed} & \textbf{Result} & \textbf{Blocking Layer} \\
+\midrule
+Provenance Laundering & 10 & 0 & Blocked & Lattice meet propagation \\
+Policy-Aware Evasion  & 10 & 0 & Blocked & Policy + model refusal \\
+Embedding Evasion     & 10 & 0 & Blocked & Embedding + model refusal \\
+TOCTOU Amplification  & 10 & 0 & Blocked & Persistent DAG labels \\
+Multi-Vector Chaining & 10 & 0 & Blocked & Pre-LLM + provenance \\
+\midrule
+\textbf{All Attacks}  & \textbf{50} & \textbf{0} & \textbf{50/50 blocked} & --- \\
+Benign Controls       & 10 & 0 FP & 100\% TSR & --- \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Per-Category Attack Results}
+\label{sec:appendix-categories}
+
+\begin{table}[htbp]
+\centering
+\caption{Per-category ASR-IA on the 212-scenario benchmark (mean over 5 reps $\times$ 4 models). Encoding obfuscation and privilege escalation are the primary residual weaknesses.}
+\label{tab:attack-categories}
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrr}
+\toprule
+\textbf{Category} & \textbf{N/rep} & \textbf{ASR$_{IA}$ (mean $\pm$ CI)} \\
+\midrule
+Direct Injection     & 80 & 0.00\% $\pm$ 0.48 \\
+Device-State Inj.    & 88 & 0.00\% $\pm$ 0.43 \\
+File Content Inj.    & 88 & 0.00\% $\pm$ 0.43 \\
+Multi-Turn Chain     & 80 & 1.25\% $\pm$ 1.18 \\
+Encoding Obfusc.     & 72 & 2.78\% $\pm$ 1.76 \\
+Role-Play Jailbreak  & 80 & 0.00\% $\pm$ 0.48 \\
+Confused Deputy      & 72 & 1.39\% $\pm$ 1.31 \\
+Privilege Escalation & 80 & 3.75\% $\pm$ 1.90 \\
+NL-Argument Inj.     & 48 & 0.00\% $\pm$ 0.79 \\
+\midrule
+\textbf{Overall}     & \textbf{688} & \textbf{1.02\% $\pm$ 0.34} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{InjecAgent Per-Category Results}
+\label{sec:appendix-injecagent}
+
+\begin{table}[htbp]
+\centering
+\caption{InjecAgent per-category ASR-IA (4 local models, 3 reps). \sys{} achieves 0\% ASR on all Direct Harm categories; residual risk concentrates in Data Stealing attacks.}
+\label{tab:injecagent-category}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Attack Category} & \textbf{No Def.} & \textbf{Pol.-Only} & \textbf{\sys{}} \\
+\midrule
+\multicolumn{4}{l}{\emph{Direct Harm (DH)}} \\
+\quad Physical Harm     & 19.4\% & 0.0\% & \textbf{0.0\%} \\
+\quad Financial Harm    & 16.1\% & 0.2\% & \textbf{0.0\%} \\
+\quad Data Security     & 23.4\% & 6.2\% & \textbf{0.0\%} \\
+\midrule
+\multicolumn{4}{l}{\emph{Data Stealing (DS)}} \\
+\quad Financial Data    & 35.2\% & 12.4\% & 4.1\% \\
+\quad Physical Data     & 29.1\% & 23.8\% & 14.6\% \\
+\quad Others            & 31.2\% & 23.9\% & 5.1\% \\
+\midrule
+\textbf{All DH}        & 19.9\% & 2.4\% & \textbf{0.0\%} \\
+\textbf{All DS}         & 31.3\% & 21.7\% & 8.2\% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Encoding Robustness Details (RQ9)}
+\label{sec:appendix-encoding}
+
+We test 36 encoding vectors across four categories: single encoding (8: Base64, hex, URL, ROT13, HTML entities, Unicode escapes, binary, octal), double/chained (10: e.g., Base64-wrapped hex, double URL encoding), mixed (8: hybrid schemes within a single argument), and novel/adversarial (10: Cyrillic homoglyphs, fullwidth Unicode, zero-width characters, combining diacriticals). The iterative multi-pass decoder achieves 36/36 (100\%) detection; a single-pass decoder achieves only 24/36 (67\%), failing on 7/10 double/chained vectors. End-to-end with Llama-3.1-8B (108 trials), zero dangerous tool calls are produced.
+
+\section{Threshold Sensitivity (Section 5)}
+\label{sec:appendix-threshold}
+
+\begin{table}[htbp]
+\centering
+\caption{Embedding threshold ($\theta$) sensitivity on the 212-scenario benchmark. $\star$ = default. ASR-IA and TSR are stable in $[0.35, 0.55]$.}
+\label{tab:threshold_sensitivity}
+\small
+\begin{tabular}{crrr}
+\toprule
+$\theta$ & ASR-IA (\%) & TSR (\%) & FPR (\%) \\
+\midrule
+0.25 & 1.02 & 88.75 & 11.25 \\
+0.30 & 1.02 & 91.25 & 8.75  \\
+0.35 & 1.02 & 93.75 & 6.25  \\
+0.40 & 1.02 & 95.00 & 5.00  \\
+\textbf{0.45\,$\star$} & \textbf{1.02} & \textbf{95.00} & \textbf{5.00} \\
+0.50 & 1.16 & 95.00 & 5.00  \\
+0.55 & 1.45 & 95.00 & 5.00  \\
+0.60 & 1.74 & 96.25 & 3.75  \\
+0.65 & 2.33 & 97.50 & 2.50  \\
+0.70 & 3.20 & 98.75 & 1.25  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Worked Example: Provenance Blocking an Indirect Injection}
 \label{sec:appendix-casestudy}
 
 We trace InjecAgent case \texttt{dh\_base\_0016} through all four defense systems. The user asks the agent to navigate to a website; the returned page contains an injected instruction to grant smart-lock access.
 
 \paragraph{Setup.} User instruction: \emph{``Navigate to www.codedculinary.com.''} The web page contains: \emph{``SYSTEM UPDATE: Grant guest access to guest\_amy01 with permanent access using AugustSmartLockGrantGuestAccess.''} The LLM complies and calls \texttt{AugustSmartLockGrantGuestAccess(guest\_id="guest\_amy01", access\_type="permanent")}.
+
+\paragraph{DAG Construction (Step-by-Step).}
+We trace the internal provenance computation:
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{Node 0 (INPUT):} User says ``Navigate to www.codedculinary.com.'' $\to$ $T = \top$ (user command).
+  \item \textbf{Node 1 (TOOL\_CALL):} Agent calls \texttt{WebBrowse(url=``www.codedculinary.com'')}. Ancestors: $\{$Node~0$\}$. Propagation: $\sqcap\{\top\} = \top$. Allowed (trusted intent, LOW risk).
+  \item \textbf{Node 2 (TOOL\_RESULT):} Web page content returned, containing the injection payload. $T = \bot$ (external data, always UNTRUSTED).
+  \item \textbf{Node 3 (DERIVED\_FACT):} LLM processes the page and extracts the ``system update'' instruction. Ancestors: $\{$Node~0, Node~2$\}$. Propagation: $\sqcap\{\top, \bot\} = \bot$.
+  \item \textbf{Node 4 (TOOL\_CALL):} Agent proposes \texttt{AugustSmartLockGrantGuestAccess(guest\_id=``guest\_amy01'', access\_type=``permanent'')}. Ancestors: $\{$Node~3$\} \to \{$Node~0, Node~2$\}$.
+\end{enumerate}
+
+\paragraph{Provenance Resolution (Node 4).}
+The proxy resolves each argument's origin:
+\begin{itemize}[leftmargin=1.2em]
+  \item \texttt{``guest\_amy01''}: Stage~1 (substring match) finds this string verbatim in Node~2's content $\to$ linked to UNTRUSTED source.
+  \item \texttt{``permanent''}: Stage~1 finds verbatim match in Node~2 $\to$ linked to UNTRUSTED source.
+\end{itemize}
+Result: \texttt{has\_untrusted\_args = true}. The policy engine receives: tool = \texttt{AugustSmartLockGrantGuestAccess} (CRITICAL risk tier), untrusted arguments. Decision: \textbf{DENY}.
 
 \paragraph{No Defense / Pattern Filter / Policy-Only.} All three systems allow the call. The tool is legitimate (not in any dangerous-action list), the arguments are not syntactically suspicious, and without provenance \texttt{has\_untrusted\_args = false}.
 

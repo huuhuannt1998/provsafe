@@ -20,12 +20,12 @@ We model a \emph{remote indirect adversary} with the following capabilities and 
 \paragraph{Limitations.}
 The attacker cannot modify system prompts, compromise the \sys{} enforcement proxy, or exploit gradient-based adversarial attacks on model weights---we focus on prompt-level attacks accessible to practical remote adversaries. The attacker also has no physical access to the home network and no real-time oracle access to the defense system's internal state.
 
-\paragraph{Scope: Physical-Layer Threats.}
-Physical-layer attacks---voice injection~\cite{carlini2016hidden}, sensor spoofing, electromagnetic side channels---target input transducers rather than the LLM context window and require signal-level authentication orthogonal to \sys{}'s tool-call-boundary provenance tracking. We consider them an important but separate research direction.
+\paragraph{Explicit Scope Limitations.}
+Out of scope: (1)~attacks on the proxy or framework itself (trusted computing base); (2)~gradient-based adversarial attacks on model weights; (3)~physical-layer attacks (voice injection~\cite{carlini2016hidden}, sensor spoofing, electromagnetic side channels) that target input transducers rather than the LLM context window; (4)~multi-agent collusion; (5)~covert channels not mediated by tool calls. \sys{} enforces at the tool-call boundary and does not secure layers above (prompts) or below (model internals).
 
 \subsection{Attack Taxonomy}
 
-We categorize prompt injection attacks into 8 categories: \textbf{A1:~Direct Injection} (malicious commands in user input), \textbf{A2:~Device-State Injection} (payloads in IoT device names/states), \textbf{A3:~File-Content Injection} (payloads in files the agent reads), \textbf{A4:~Multi-Turn Chaining} (payloads split across conversation turns), \textbf{A5:~Encoding Obfuscation} (Base64, hex, ROT13, Unicode-encoded instructions), \textbf{A6:~Role-Play Jailbreak} (persona-based system prompt overrides), \textbf{A7:~Confused Deputy} (tricking the agent into misusing legitimate capabilities), and \textbf{A8:~Privilege Escalation} (progressive unauthorized access through individually benign calls).
+We categorize prompt injection attacks into 9 categories: \textbf{A1:~Direct Injection} (malicious commands in user input), \textbf{A2:~Device-State Injection} (payloads in IoT device names/states), \textbf{A3:~File-Content Injection} (payloads in files the agent reads), \textbf{A4:~Multi-Turn Chaining} (payloads split across conversation turns), \textbf{A5:~Encoding Obfuscation} (Base64, hex, ROT13, Unicode-encoded instructions), \textbf{A6:~Role-Play Jailbreak} (persona-based system prompt overrides), \textbf{A7:~Confused Deputy} (tricking the agent into misusing legitimate capabilities), \textbf{A8:~Privilege Escalation} (progressive unauthorized access through individually benign calls), and \textbf{A9:~NL-Argument Injection} (embedding malicious arguments in natural-language tool parameters that the LLM paraphrases, evading substring-based provenance resolution).
 
 \subsection{Security Goals and Enforcement Properties}
 
@@ -36,39 +36,15 @@ A defense for tool-using LLM agents must satisfy five security goals:
   \item \textbf{Integrity}: Prevent unauthorized modifications to the smart home state (e.g., unlocking doors, deleting files, changing thermostat settings).
   \item \textbf{Availability}: Prevent denial-of-service attacks (e.g., rebooting all devices, clearing all calendar events).
   \item \textbf{Least Privilege}: Ensure every tool call is justified only by trusted user instructions---not by attacker-injected content.
-  \item \textbf{Usability}: Minimize false positives and confirmation burden so the agent remains practical for daily use. A defense that blocks all tool calls achieves maximal security at the cost of complete loss of functionality; provenance-gated policies enable fine-grained trust decisions that maintain high task success rates.
+  \item \textbf{Usability}: Minimize false positives so the agent remains practical. Provenance-gated policies enable fine-grained trust decisions that maintain high task success rates.
 \end{enumerate}
 
-\sys{} provides three enforcement design invariants---architectural guarantees that hold by construction rather than by formal proof:
+\sys{} provides three enforcement design invariants (formal statements and justifications in Appendix~\ref{sec:appendix-proofs}):
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{Complete Mediation}: every tool call passes through the enforcement proxy before execution---the agent has no direct path to tool executors.
+  \item \textbf{Policy Determinism}: for fixed policy, provenance graph, and decision context, repeated evaluations produce the same result (first-match semantics, no randomness).
+  \item \textbf{Conservative Trust Propagation}: trust labels propagate via the lattice meet $\sqcap$; no trust ``upgrade'' is possible without explicit user declassification. Taint monotonicity ($T(u)=\bot \Rightarrow T(v)=\bot$ for descendants $v$) holds by construction.
+\end{enumerate}
 
-\begin{property}[Complete Mediation]
-For every tool call $c$ proposed by the agent, $c$ is evaluated by the enforcement proxy before execution. Formally,
-\[
-\begin{aligned}
-\forall c \in \mathit{ToolCalls}:\quad
-\mathit{execute}(c) \Rightarrow {}&\big(P(c)=\textsf{ALLOW} \\
-&\lor \big(P(c)=\textsf{CONFIRM} \land \mathit{uc}(c)\big)\big).
-\end{aligned}
-\]
-Here, \textsf{CONFIRM} is shorthand for \textsf{REQUIRE\_CONFIRMATION}, and $\mathit{uc}(c)$ denotes $\mathit{user\_confirmed}(c)$.
-This holds by construction: the proxy intercepts all tool-call dispatch at the framework level; the agent has no direct path to tool executors.
-\end{property}
-
-\begin{property}[Policy Determinism]
-For any tool call $c$ with arguments $a$, provenance graph $G$, fixed policy $\pi$, and fixed decision context $\xi=(t,\rho)$ (evaluation time/window $t$ and rate-limit state $\rho$), repeated evaluations produce the same result. Formally,
-\[
-P_i(c, a, G, \pi, \xi) = P_j(c, a, G, \pi, \xi)
-\quad \text{for any invocations } i,j.
-\]
-This follows from the rule-matching algorithm (Algorithm~\ref{alg:policy}): first-match semantics over an ordered rule list with conjunctive conditions and no randomness. Replay equivalence holds when policy, provenance graph, and time/rate-limit state are fixed, enabling audit replay verification (Section~\ref{sec:proxy}).
-\end{property}
-
-\begin{property}[Conservative Trust Propagation]
-Trust labels are drawn from a two-element lattice $\mathcal{L} = \{\top, \bot\}$ ($\top$ = TRUSTED, $\bot$ = UNTRUSTED) and propagate via the lattice meet ($\sqcap$) over ancestors (Eq.~\ref{eq:trust-propagation}, Section~\ref{sec:policies})---no trust ``upgrade'' is possible without explicit user declassification. The meet-based propagation guarantees \emph{taint monotonicity}: $T(u) = \bot \Rightarrow T(v) = \bot$ for all descendants $v$ of $u$. Attacker-controlled content cannot shed its $\bot$ label through intermediate processing steps (validated in the provenance laundering experiments: 0/3 bypassed, Section~\ref{subsec:adaptive}).
-\end{property}
-
-\paragraph{Explicit Scope Limitations.}
-The following threats are \emph{out of scope} for \sys{}: (1)~attacks that compromise the enforcement proxy itself or the agent framework (we assume a trusted computing base below the LLM); (2)~gradient-based adversarial attacks on model weights, which require white-box access to model internals; (3)~physical-layer attacks (voice injection, sensor spoofing, electromagnetic side channels) that target input transducers rather than the LLM context window; (4)~multi-agent collusion, where multiple compromised agents coordinate to circumvent per-agent provenance tracking; (5)~confidentiality attacks through covert channels not mediated by the tool-call boundary (e.g., timing side channels, steganographic encoding in permitted outputs); and (6)~attacks on the policy itself (policy misconfiguration is a deployment concern, not a defense bypass). These boundaries reflect a deliberate design choice: \sys{} enforces security at the tool-call boundary and does not attempt to secure layers above (prompt engineering) or below (model internals, hardware) that boundary.
-
-\paragraph{Enforcement Soundness and Limitations.}
-Properties 1--3 guarantee that \emph{if provenance is correctly resolved}, the policy decision is sound. However, provenance resolution is inherently an approximation: the LLM's internal computation is opaque, so we infer argument provenance by matching tool-call arguments against known untrusted content. False negatives (failing to detect untrusted origin) weaken security; false positives (incorrectly labeling trusted content as untrusted) weaken usability. To maximize resolution accuracy, \sys{} uses a three-stage pipeline: substring matching (exact string lookup), embedding similarity (cosine similarity $\geq \theta = 0.45$ with all-MiniLM-L6-v2), and conservative default (unknown provenance $\to$ UNTRUSTED). We evaluate the effectiveness of this pipeline in Section~\ref{sec:eval}.
+\paragraph{Enforcement Soundness.}
+Properties 1--3 guarantee sound decisions \emph{if provenance is correctly resolved}. Provenance resolution is approximate (the LLM is opaque), so \sys{} uses a three-stage pipeline: substring matching, embedding similarity ($\theta = 0.45$, all-MiniLM-L6-v2), and conservative UNTRUSTED default. Effectiveness is evaluated in Section~\ref{sec:eval}.

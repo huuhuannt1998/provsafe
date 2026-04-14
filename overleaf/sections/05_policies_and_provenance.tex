@@ -19,16 +19,15 @@ rules:
       path_prefix: "/home/user/"
       provenance_trust: "trusted"
     action: ALLOW
-  - name: "Confirm untrusted deletes"
-    tools: ["fs.delete"]
-    conditions:
-      provenance_trust: "untrusted"
-    action: REQUIRE_CONFIRMATION
   - name: "Deny system file access"
     tools: ["fs.read", "fs.write"]
     conditions:
-      path_prefix: ["/etc/", "/sys/"]
+      path_prefix: "/etc/"
     action: DENY
+  - name: "Confirm untrusted deletes"
+    tools: ["fs.delete"]
+    conditions: {provenance_trust: "untrusted"}
+    action: REQUIRE_CONFIRMATION
 \end{verbatim}
 
 \paragraph{Evaluation Semantics.}
@@ -36,24 +35,42 @@ Rules are evaluated top-to-bottom; the first matching rule determines the action
 
 \subsection{Provenance Tracking}
 
-\begin{figure}[t]
+\begin{figure*}[t]
   \centering
-  \includegraphics[width=\columnwidth]{figures/provenance_graph.png}
-  \caption{Provenance graph example. Trust propagation through a multi-turn conversation.
-  User commands are TRUSTED; tool results from external sources are UNTRUSTED. Any fact derived from
-  untrusted input inherits the untrusted label, enabling provenance-aware policy enforcement.}
+  \includegraphics[width=0.95\textwidth]{figures/provenance_stepped.pdf}
+  \caption{Step-by-step provenance DAG construction for a two-turn indirect injection attack. \textbf{Step~1:} User command creates INPUT[0] ($\top$). \textbf{Step~2:} Agent calls \texttt{device.list()}; ancestors $= \{\top\}$, so CALL[1] is $\top$. \textbf{Step~3:} External device list returns with malicious name; RESULT[2] $= \bot$ (always). \textbf{Step~4:} LLM summarizes the device list; FACT[3] inherits $\sqcap\{\top, \bot\} = \bot$ from Node~2. \textbf{Step~5:} User says ``act on alerts'' (INPUT[4], $\top$), but LLM combines it with tainted FACT[3]; FACT[5] $= \sqcap\{\top, \bot\} = \bot$. \textbf{Step~6:} The proposed \texttt{fs.delete} call inherits $\bot$; CRITICAL risk + UNTRUSTED $\Rightarrow$ \textbf{DENY}. Green borders = trusted; red borders = untrusted.}
   \label{fig:provenance-graph}
-\end{figure}
+\end{figure*}
+
+\paragraph{Intuition.}
+The provenance graph tracks the origin of every piece of data the agent processes. It has two kinds of starting nodes with fixed labels: \emph{user commands} are always TRUSTED, and \emph{external data} (device names, file contents, API responses) is always UNTRUSTED. Every other node inherits its label by looking at all its ancestors---if \emph{any} ancestor is UNTRUSTED, the node is UNTRUSTED. Trust can only be restored by explicit user confirmation. When a tool call is proposed, the proxy checks whether its arguments trace back to untrusted sources; if so, the policy can deny or escalate.
+
+\begin{table}[t]
+\centering
+\caption{Provenance node types. Labels are assigned at creation for leaf nodes and computed by propagation for derived nodes.}
+\label{tab:node-types}
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Type} & \textbf{Created when} & \textbf{Default $T$} & \textbf{Example} \\
+\midrule
+INPUT & User issues command & $\top$ & ``List devices'' \\
+TOOL\_RESULT & Tool returns data & $\bot$ & Device list \\
+DERIVED\_FACT & LLM produces content & propagated & ``Alert about\ldots'' \\
+TOOL\_CALL & LLM proposes tool call & propagated & \texttt{fs.delete(\ldots)} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \paragraph{Formal Provenance Model.}
-\sys{} maintains a provenance graph adapted from the W3C PROV Data Model~\cite{prov-dm} (Fig.~\ref{fig:provenance-graph}). Formally, the graph is a DAG $G = (V, E, T, \tau)$ where:
+\sys{} maintains a provenance graph adapted from the W3C PROV Data Model~\cite{prov-dm} (Fig.~\ref{fig:provenance-graph}, Table~\ref{tab:node-types}). Formally, the graph is a DAG $G = (V, E, T, \tau)$ where:
 \begin{itemize}[leftmargin=1.5em]
   \item $V$ is a set of \emph{provenance nodes} (PROV-DM entities), each typed as INPUT (user commands), TOOL\_RESULT (tool outputs), DERIVED\_FACT (LLM-generated content), or TOOL\_CALL (proposed tool invocations).
   \item $E \subseteq V \times V$ is a set of directed \emph{derivation edges} corresponding to the PROV-DM \texttt{wasDerivedFrom} relation: $(v_i, v_j) \in E$ means $v_i$ was derived from $v_j$.
   \item $T: V \to \mathcal{L}$ assigns each node a trust label from the two-element lattice $\mathcal{L} = \{\top, \bot\}$ ($\top$ = TRUSTED, $\bot$ = UNTRUSTED), with $\bot \sqsubseteq \top$.
   \item $\tau: V \to \mathbb{N}$ assigns a creation timestamp for temporal ordering.
 \end{itemize}
-Nodes are created at four points: (1)~when the user issues a command (INPUT, $T = \top$); (2)~when a tool returns a result from an external source (TOOL\_RESULT, $T = \bot$); (3)~when the LLM produces content referencing prior nodes (DERIVED\_FACT, $T$ computed by propagation); (4)~when the LLM proposes a tool invocation (TOOL\_CALL, used for policy evaluation). LLM-generated content with \emph{no traceable source nodes} also defaults to $\bot$ (UNTRUSTED)---the conservative choice is that a value with no provenance should not be assumed safe. Only values with at least one explicit trusted ancestor and no untrusted ancestors receive label $\top$. This captures \emph{why-provenance}~\cite{buneman2001provenance}---which source entities contributed to a derived entity---at the tool-call boundary. We do not track \emph{how-provenance} (the LLM's internal transformation) because the model is opaque.
+Nodes are created at four points: (1)~when the user issues a command (INPUT, $T = \top$); (2)~when a tool returns a result from an external source (TOOL\_RESULT, $T = \bot$); (3)~when the LLM produces content referencing prior nodes (DERIVED\_FACT, $T$ computed by propagation); (4)~when the LLM proposes a tool invocation (TOOL\_CALL, used for policy evaluation). LLM-generated content with \emph{no traceable source nodes} also defaults to $\bot$ (UNTRUSTED)---the conservative choice is that a value with no provenance should not be assumed safe. Only values with at least one explicit trusted ancestor and no untrusted ancestors receive label $\top$. Critically, TOOL\_CALL trust reflects the \emph{origin of the intent}---who authorized the action---while TOOL\_RESULT trust reflects the \emph{origin of the content}---where the data came from. These are independent: a trusted user command triggers a tool call whose result is untrusted (external data). This captures \emph{why-provenance}~\cite{buneman2001provenance}---which source entities contributed to a derived entity---at the tool-call boundary. We do not track \emph{how-provenance} (the LLM's internal transformation) because the model is opaque.
 
 \paragraph{Trust Propagation.}
 Trust labels propagate via the lattice meet ($\sqcap$) over ancestors:
@@ -63,50 +80,27 @@ T(v) = \sqcap_{u \in \text{ancestors}(v)} T(u) = \begin{cases} \top & \text{if }
 \end{equation}
 This conservative propagation ensures monotonicity: once a node acquires the $\bot$ (UNTRUSTED) label through any ancestor, no subsequent derivation can restore $\top$ without explicit user declassification (a controlled \emph{downgrading} operation~\cite{difc-survey}).
 
-\paragraph{Why a Two-Element Lattice Suffices.}
-We argue that the two-element lattice is the right design point; Section~\ref{sec:discussion} discusses why a richer lattice would not improve precision in our threat model.
+\paragraph{Why a Two-Element Lattice.}
+The binary lattice is the right design point (discussed in Section~\ref{sec:discussion}); multi-level trust for authenticated sources is future work.
 
-We state three formal properties of the provenance model:
+We state three formal properties of the provenance model (proofs in Appendix~\ref{sec:appendix-proofs}):
 \begin{enumerate}[leftmargin=1.5em]
   \item \textbf{Propagation Soundness}: If $T(v) = \top$ for a TOOL\_CALL node $v$, then every source entity reachable from $v$ via $E$ has label $\top$. (Holds by induction over BFS depth.)
   \item \textbf{Taint Monotonicity}: For any nodes $v_1, v_2$ where $v_1$ is an ancestor of $v_2$: $T(v_1) = \bot \Rightarrow T(v_2) = \bot$. (Follows directly from the $\sqcap$ definition.)
-  \item \textbf{Declassification Control}: The only operation that changes $T(v)$ from $\bot$ to $\top$ is an authenticated user confirmation. No agent action or tool result can upgrade trust. (Enforced by the proxy: only the \texttt{user\_confirm} event modifies labels.)
+  \item \textbf{Declassification Control}: The only operation that changes $T(v)$ from $\bot$ to $\top$ is an authenticated user confirmation. No agent action or tool result can upgrade trust.
 \end{enumerate}
 
 \paragraph{Provenance Queries.}
-At decision time, the policy engine queries the graph via three operations that correspond to standard provenance interrogation~\cite{cheney2009provenance}: \texttt{get\_sources(c)} returns all source nodes reachable from tool call $c$ (why-provenance); \texttt{is\_trusted(c)} computes $\sqcap_{u \in \text{ancestors}(c)} T(u)$; \texttt{get\_untrusted\_sources(c)} returns specific $\bot$-labeled sources for user-facing explanations (a restricted form of where-provenance). All queries use BFS over ancestor edges in $O(|V| + |E|)$; in practice, graph depth is 5--10 and $|V| < 100$ per session.
+At decision time, the policy engine queries the graph: \texttt{get\_sources(c)} returns all source nodes (why-provenance); \texttt{is\_trusted(c)} computes $\sqcap_{u \in \text{ancestors}(c)} T(u)$; \texttt{get\_untrusted\_sources(c)} returns $\bot$-labeled sources for user-facing explanations. All queries use BFS in $O(|V| + |E|)$; in practice $|V| < 100$ per session.
 
 \paragraph{Provenance Resolution Pipeline.}
-Provenance resolution determines whether a tool-call argument traces to untrusted content. \sys{} uses a three-stage pipeline as the default configuration:
+Provenance resolution determines whether a tool-call argument traces to untrusted content. \sys{} uses a three-stage pipeline:
 \begin{enumerate}[leftmargin=1.5em]
-  \item \textbf{Substring match} (fast path): Check if the tool-call argument appears verbatim in any TOOL\_RESULT node content. This handles literal arguments (file paths, email addresses, device IDs) with O($n$) scan over stored nodes.
-  \item \textbf{Embedding similarity}: If no substring match, compute cosine similarity between the argument's sentence embedding (all-MiniLM-L6-v2, 384 dimensions) and all TOOL\_RESULT node embeddings. Matches above threshold $\theta = 0.45$ link the argument to the untrusted source. This handles natural-language arguments that the LLM may have paraphrased. Overhead: $<$5\,ms per comparison, no GPU required.
-  \item \textbf{Conservative default}: If neither method resolves provenance, the argument is labeled UNTRUSTED (fail-safe). This ensures that unknown provenance never leads to a false sense of trust.
+  \item \textbf{Substring match} (fast path): Check if the argument appears verbatim in any TOOL\_RESULT node content. Handles literal arguments (file paths, email addresses, device IDs) with $O(n)$ scan.
+  \item \textbf{Embedding similarity}: Compute cosine similarity between the argument's sentence embedding (all-MiniLM-L6-v2, 384-d) and all TOOL\_RESULT node embeddings. Matches above threshold $\theta = 0.45$ link the argument to the untrusted source, handling paraphrased content. Overhead: $<$5\,ms per comparison, no GPU required.
+  \item \textbf{Conservative default}: If neither method resolves provenance, the argument is labeled UNTRUSTED (fail-safe).
 \end{enumerate}
-The threshold $\theta = 0.45$ was selected via 5-fold cross-validation on 20 held-out paraphrase pairs, optimizing for $F_1$ score. The full pipeline achieves 100\% provenance recall across all 96 paraphrase tests (Section~\ref{subsec:paraphrase}), compared to 40.6\% for substring matching alone.
+The threshold $\theta = 0.45$ was selected via 5-fold cross-validation on 20 held-out paraphrase pairs, optimizing for $F_1$ score. The pipeline achieves 100\% provenance recall across 96 paraphrase tests (Section~\ref{subsec:paraphrase}), vs.\ 40.6\% for substring alone.
 
-\paragraph{Threshold Sensitivity and Calibration Limitations.}
-The 20-pair calibration set is small; we acknowledge this as a limitation. To address this concern quantitatively, we conduct a full threshold sweep across $\theta \in \{0.25, 0.30, \ldots, 0.70\}$ on the complete 212-scenario benchmark (Table~\ref{tab:threshold_sensitivity}). The results confirm that the system is \emph{not} sensitive to small perturbations of $\theta$: in the range $0.35 \leq \theta \leq 0.55$, ASR-IA and TSR vary by less than 0.5\% and 1.0\% respectively, consistent with the initial cross-validation finding. At $\theta < 0.30$, false positive rate increases as semantically unrelated text matches as paraphrases. At $\theta > 0.60$, provenance recall drops on lexically-distant paraphrases, raising ASR-IA. The operating point $\theta = 0.45$ lies near the Pareto frontier of the ASR--FPR tradeoff. The conservative UNTRUSTED Stage-3 default provides an additional safety net: even if the embedding threshold misclassifies a paraphrase, the fail-safe ensures the argument is treated as untrusted rather than trusted. Furthermore, the threshold sweep in Table~\ref{tab:threshold_sensitivity} is conducted on the same 212-scenario benchmark used for evaluation, limiting its value as independent validation. Cross-validation on held-out InjecAgent paraphrase cases would provide stronger evidence; we leave this to future work.
-
-\begin{table}[t]
-\centering
-\caption{Embedding threshold ($\theta$) sensitivity analysis on the 212-scenario benchmark. $\star$ marks the default operating point. ASR-IA and TSR are stable in $[0.35, 0.55]$.}
-\label{tab:threshold_sensitivity}
-\small
-\begin{tabular}{crrr}
-\toprule
-$\theta$ & ASR-IA (\%) & TSR (\%) & FPR (\%) \\
-\midrule
-0.25 & 1.02 & 88.75 & 11.25 \\
-0.30 & 1.02 & 91.25 & 8.75  \\
-0.35 & 1.02 & 93.75 & 6.25  \\
-0.40 & 1.02 & 95.00 & 5.00  \\
-\textbf{0.45\,$\star$} & \textbf{1.02} & \textbf{95.00} & \textbf{5.00} \\
-0.50 & 1.16 & 95.00 & 5.00  \\
-0.55 & 1.45 & 95.00 & 5.00  \\
-0.60 & 1.74 & 96.25 & 3.75  \\
-0.65 & 2.33 & 97.50 & 2.50  \\
-0.70 & 3.20 & 98.75 & 1.25  \\
-\bottomrule
-\end{tabular}
-\end{table}
+\paragraph{Threshold Sensitivity.}
+A threshold sweep ($\theta \in [0.25, 0.70]$, Table~\ref{tab:threshold_sensitivity} in Appendix~\ref{sec:appendix-threshold}) confirms stability: ASR-IA and TSR vary by $<$0.5\% and $<$1.0\% in $[0.35, 0.55]$. The conservative Stage-3 default provides a safety net even if the threshold misclassifies.

@@ -48,6 +48,7 @@ from agentdojo.agent_pipeline.tool_execution import (
 from agentdojo.attacks.base_attacks import BaseAttack
 from agentdojo.benchmark import benchmark_suite_with_injections, SuiteResults
 from agentdojo.functions_runtime import EmptyEnv, Env, FunctionsRuntime
+from agentdojo.logging import OutputLogger
 from agentdojo.task_suite import get_suites
 from agentdojo.types import ChatMessage, ChatToolResultMessage
 
@@ -172,6 +173,57 @@ def _extract_text(content: Any) -> str:
     return str(content) if content else ""
 
 
+# ── Embedding model (lazy singleton) ──
+
+_embedding_model = None
+_embedding_available: Optional[bool] = None
+
+
+def _get_embedding_model():
+    """Lazy-load the all-MiniLM-L6-v2 sentence embedding model.
+
+    Returns None if sentence-transformers is not installed.
+    """
+    global _embedding_model, _embedding_available
+    if _embedding_available is False:
+        return None
+    if _embedding_model is not None:
+        return _embedding_model
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        _embedding_available = True
+        log.info("Loaded embedding model all-MiniLM-L6-v2 for provenance resolution")
+        return _embedding_model
+    except ImportError:
+        log.warning(
+            "sentence-transformers not installed; falling back to substring-only resolution"
+        )
+        _embedding_available = False
+        return None
+
+
+def _embedding_match(
+    model: Any,
+    arg_str: str,
+    sources: List[str],
+    threshold: float,
+) -> bool:
+    """Check if arg_str semantically matches any source above cosine threshold."""
+    import numpy as np
+
+    non_empty = [s for s in sources if s and len(s.strip()) > 2]
+    if not non_empty:
+        return False
+    texts = [arg_str] + non_empty
+    vecs = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+    q_vec = vecs[0]
+    c_vecs = vecs[1:]
+    scores = c_vecs @ q_vec
+    return float(np.max(scores)) >= threshold
+
+
 def _build_trusted_and_untrusted(
     messages: Sequence[ChatMessage], user_query: str
 ) -> Tuple[List[str], List[str]]:
@@ -203,34 +255,54 @@ def _is_tainted(
     """Three-stage provenance resolution adapted for AgentDojo.
 
     Stage 1: Exact substring match in trusted sources → TRUSTED → not tainted
-    Stage 2: Exact substring match in untrusted sources → UNTRUSTED → tainted
+             If found in untrusted too, trusted wins.
+    Stage 2: Embedding cosine similarity (all-MiniLM-L6-v2) → above threshold
+             means semantic match; trusted match wins over untrusted.
     Stage 3: Conservative default → UNTRUSTED (tainted)
 
-    If found in BOTH trusted and untrusted, trusted wins
-    (user could have provided the same value).
-
-    Note: Embedding-based matching (Stage 2 of PROVSAFE's pipeline) is omitted
-    here for speed since AgentDojo runs many trials. The substring + conservative
-    default already captures the core provenance signal.
+    Short values (numbers, booleans, <=20 chars) are exempted to preserve
+    utility on benign tasks.
     """
     arg_str = str(arg_value).strip()
     if not arg_str or len(arg_str) < 3:
-        # Very short args (single chars, numbers) are not meaningfully taintable
         return False
 
-    # Stage 1: Check if arg comes from trusted sources
+    # Stage 1: Check substring match in trusted sources
+    trusted_substr = False
     for source in trusted_sources:
         if not source:
             continue
         if arg_str in source:
-            return False  # Found in trusted → not tainted
+            trusted_substr = True
+            break
 
-    # Stage 2: Check if arg comes from untrusted sources
+    untrusted_substr = False
     for source in untrusted_sources:
         if not source:
             continue
         if arg_str in source:
-            return True  # Found in untrusted → tainted
+            untrusted_substr = True
+            break
+
+    # Trusted substring wins
+    if trusted_substr:
+        return False
+    if untrusted_substr:
+        return True
+
+    # Stage 2: Embedding cosine similarity
+    emb_model = _get_embedding_model()
+    if emb_model is not None:
+        trusted_match = _embedding_match(emb_model, arg_str, trusted_sources, threshold)
+        untrusted_match = _embedding_match(emb_model, arg_str, untrusted_sources, threshold)
+
+        if trusted_match and not untrusted_match:
+            return False
+        if untrusted_match and not trusted_match:
+            return True
+        if trusted_match and untrusted_match:
+            # Both match semantically — trusted wins
+            return False
 
     # Stage 3: Conservative default → tainted
     # Short numeric/boolean values are likely benign model outputs
@@ -502,31 +574,25 @@ def get_lmstudio_llm(model_id: Optional[str] = None) -> OpenAILLM:
 # ============================================================================
 
 
-def load_attack(attack_name: str) -> BaseAttack:
-    """Load an attack by name from AgentDojo's registry."""
-    # Import attack classes directly
-    from agentdojo.attacks.important_instructions_attacks import (
-        ImportantInstructionsAttack,
-        ImportantInstructionsAttackNoUserName,
-    )
-    from agentdojo.attacks.tool_knowledge_attacks import ToolKnowledgeAttack
-    from agentdojo.attacks.injecagent_attack import InjecAgentAttack
-    from agentdojo.attacks.direct_attack import DirectAttack
-    from agentdojo.attacks.dos_attacks import DoSAttack
+def load_attack(
+    attack_name: str,
+    suite: "TaskSuite",
+    pipeline: BasePipelineElement,
+) -> BaseAttack:
+    """Load an attack by name from AgentDojo's registry.
 
-    ATTACK_MAP = {
-        "important_instructions": ImportantInstructionsAttack,
-        "important_instructions_no_user_name": ImportantInstructionsAttackNoUserName,
-        "tool_knowledge": ToolKnowledgeAttack,
-        "injecagent": InjecAgentAttack,
-        "direct": DirectAttack,
-        "dos": DoSAttack,
-    }
+    Args:
+        attack_name: Registered attack name (e.g. 'important_instructions').
+        suite: The TaskSuite the attack targets.
+        pipeline: The pipeline being attacked.
+    """
+    from agentdojo.attacks.attack_registry import ATTACKS
 
-    cls = ATTACK_MAP.get(attack_name)
-    if cls is None:
-        raise ValueError(f"Unknown attack: {attack_name}. Available: {list(ATTACK_MAP.keys())}")
-    return cls()
+    if attack_name not in ATTACKS:
+        raise ValueError(
+            f"Unknown attack: {attack_name}. Available: {sorted(ATTACKS.keys())}"
+        )
+    return ATTACKS[attack_name](suite, pipeline)
 
 
 def run_agentdojo_benchmark(
@@ -567,13 +633,16 @@ def run_agentdojo_benchmark(
     if model in ("gpt-4o-mini", "gpt-4o-mini-2024-07-18"):
         llm = get_openai_llm("gpt-4o-mini-2024-07-18")
         model_name = "gpt-4o-mini"
+        model_id = "gpt-4o-mini-2024-07-18"
     elif model == "local":
         llm = get_lmstudio_llm()
         model_name = getattr(llm, "model", "local")
+        model_id = model_name
     else:
         # Try as LM Studio model ID
         llm = get_lmstudio_llm(model)
         model_name = model
+        model_id = model
 
     # Load suites
     all_suites = get_suites(benchmark_version)
@@ -582,15 +651,9 @@ def run_agentdojo_benchmark(
     else:
         suites = all_suites
 
-    # Setup attacks
+    # Setup attack names (attacks are instantiated per-suite/pipeline combo)
     if attack_names is None:
         attack_names = ATTACK_NAMES
-    attacks = {}
-    for aname in attack_names:
-        try:
-            attacks[aname] = load_attack(aname)
-        except (ValueError, ImportError) as e:
-            log.warning("Skipping attack %s: %s", aname, e)
 
     # Setup defenses
     if defense_names is None:
@@ -601,7 +664,7 @@ def run_agentdojo_benchmark(
     log.info("=" * 70)
     log.info("Model: %s", model_name)
     log.info("Suites: %s", list(suites.keys()))
-    log.info("Attacks: %s", list(attacks.keys()))
+    log.info("Attacks: %s", attack_names)
     log.info("Defenses: %s", defense_names)
     log.info("Output: %s", output_path)
     log.info("Quick mode: %s", quick)
@@ -612,9 +675,17 @@ def run_agentdojo_benchmark(
     total_trials = 0
     start_time = time.time()
 
-    for defense_name in defense_names:
+    # Initialize AgentDojo's logger stack (NullLogger without __enter__ lacks logdir)
+    log_dir_str = str(output_path / "logs")
+    os.makedirs(log_dir_str, exist_ok=True)
+    _output_logger = OutputLogger(logdir=log_dir_str)
+    _output_logger.__enter__()
+
+    try:
+
+     for defense_name in defense_names:
         for suite_name, suite in suites.items():
-            for attack_name, attack in attacks.items():
+            for attack_name in attack_names:
                 result_key = f"{defense_name}|{suite_name}|{attack_name}"
 
                 # Skip if already completed
@@ -644,6 +715,17 @@ def run_agentdojo_benchmark(
                         continue
                 else:
                     log.warning("Unknown defense: %s", defense_name)
+                    continue
+
+                # Ensure pipeline has a name (required by AgentDojo logging)
+                if pipeline.name is None:
+                    pipeline.name = f"{model_id}-{defense_name}"
+
+                # Load attack (requires suite + pipeline)
+                try:
+                    attack = load_attack(attack_name, suite, pipeline)
+                except (ValueError, ImportError) as e:
+                    log.warning("Skipping attack %s: %s", attack_name, e)
                     continue
 
                 # Select user tasks for quick mode
@@ -676,8 +758,8 @@ def run_agentdojo_benchmark(
                     )
 
                 # Calculate metrics
-                utility_vals = list(suite_results.utility_results.values())
-                security_vals = list(suite_results.security_results.values())
+                utility_vals = list(suite_results["utility_results"].values())
+                security_vals = list(suite_results["security_results"].values())
 
                 n_utility = len(utility_vals)
                 n_security = len(security_vals)
@@ -727,6 +809,9 @@ def run_agentdojo_benchmark(
 
                 # Save checkpoint after each combination
                 checkpoint_file.write_text(json.dumps(all_results, indent=2, default=str))
+
+    finally:
+        _output_logger.__exit__(None, None, None)
 
     # ============================================================================
     # Summary

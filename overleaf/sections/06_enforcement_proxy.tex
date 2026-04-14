@@ -14,12 +14,12 @@ The enforcement proxy intercepts every tool call between the LLM agent and tool 
 
 The proxy executes a seven-stage pipeline for every proposed tool call (Fig.~\ref{fig:proxy}):
 \textbf{(1)~Interception} of the tool invocation;
-\textbf{(2)~Argument pre-processing}---an iterative multi-pass canonicalization decoder that applies up to three fixpoint rounds of decoding through twelve encoding schemes (Unicode NFKD, hex escapes, octal, Base64, pure hex, ROT13, URL percent-encoding with double-decode, binary strings, HTML entities, \texttt{\textbackslash{}uXXXX} Unicode escapes, tab-separated hex, and mixed-radix sequences), followed by a Unicode confusable mapping that normalizes visually similar characters (e.g., Cyrillic `\texttt{a}' $\to$ Latin `\texttt{a}', fullwidth digits $\to$ ASCII digits). The iterative design handles chained encodings (e.g., Base64-wrapped hex, double URL encoding) that single-pass decoders miss. \emph{Critically, this stage marks flagged arguments as UNTRUSTED rather than short-circuiting the pipeline.} This ensures the provenance and policy stages are always consulted, enabling ablation studies and preventing the canonicalization pass from becoming a single point of failure;
-\textbf{(3)~Provenance resolution} via the three-stage pipeline (Section~\ref{sec:policies}), incorporating any untrusted labels injected by Stage~2;
-\textbf{(4)~Policy evaluation} in priority order (Algorithm~\ref{alg:policy}), with provenance information from Stages~2--3 combined into a single \texttt{has\_untrusted\_args} signal;
-\textbf{(5)~User confirmation} if the matched rule returns REQUIRE\_CONFIRMATION;
+\textbf{(2)~Argument pre-processing}---an iterative multi-pass decoder applying up to three fixpoint rounds across twelve encoding schemes (Unicode NFKD, hex/octal escapes, Base64, ROT13, URL percent-encoding with double-decode, binary, HTML entities, \texttt{\textbackslash{}uXXXX} escapes, tab-hex, mixed-radix), followed by Unicode confusable normalization. The iterative design handles chained encodings that single-pass decoders miss. Flagged arguments are marked UNTRUSTED rather than short-circuiting, ensuring provenance and policy stages are always consulted;
+\textbf{(3)~Provenance resolution} via the three-stage pipeline (Section~\ref{sec:policies});
+\textbf{(4)~Policy evaluation} in priority order (Algorithm~\ref{alg:policy});
+\textbf{(5)~User confirmation} if REQUIRE\_CONFIRMATION;
 \textbf{(6)~Decision logging} in an append-only, SHA-256--chained audit ledger;
-\textbf{(7)~Execution or denial}---approved calls proceed; denied calls return errors to the agent.
+\textbf{(7)~Execution or denial}.
 
 \subsection{Policy Evaluation Algorithm}
 
@@ -55,4 +55,4 @@ The algorithm is intentionally simple: complex reasoning about information linea
 
 \subsection{Auditability and Replay}
 
-The proxy's determinism enables \emph{replay verification}: given a prior decision log, identical tool-call/provenance inputs, and the same temporal/rate-limit state, administrators can re-execute decisions and confirm identical results. Decision logs are encrypted at rest and tamper-evident via SHA-256 hash chaining. The proxy integrates with agents via Python decorators or as an HTTP/gRPC server, requiring no modifications to agent internals.
+The proxy's determinism enables \emph{replay verification}: given a prior decision log and identical inputs, administrators can re-execute decisions and confirm identical results. Decision logs are tamper-evident via SHA-256 hash chaining. The proxy integrates via Python decorators or as an HTTP/gRPC server, requiring no modifications to agent internals.

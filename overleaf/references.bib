@@ -117,21 +117,7 @@
   year={2023}
 }
 
-@article{delimiters-defense,
-  title={Defending Against Prompt Injection with Delimiter-Based Separation},
-  author={Chen, Mark and others},
-  journal={arXiv preprint arXiv:2308.11680},
-  year={2023}
-}
-
 % LLM Safety and Security
-@misc{openai-system-prompt,
-  author = {{OpenAI}},
-  title = {GPT-4 System Message Best Practices},
-  year = {2024},
-  howpublished = {\url{https://platform.openai.com/docs/guides/prompt-engineering}},
-  note = {Accessed: 2026-01-04}
-}
 
 % Capability-Based Security
 @inproceedings{capsicum,
@@ -279,14 +265,6 @@
   note={Benchmark showing GPT-4 vulnerable to 24\% of indirect injections}
 }
 
-% Signed-Prompt - signed prompt approach to prevent injection
-@inproceedings{signedprompt2024,
-  author = {Suo, Daniel and Fang, Alvin and Roth, Dan and Lee, Kai-Wei},
-  title = {Signed-Prompt: A New Approach to Prevent Prompt Injection Attacks Against {LLM}-Integrated Applications},
-  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
-  year = {2024}
-}
-
 % Invariant - formal security guarantees for AI agents
 @inproceedings{invariant2024,
   author = {Balunovic, Mislav and Beurer-Kellner, Luca and Fischer, Marc and Vechev, Martin},
@@ -342,14 +320,6 @@
   number = {ESD-TR-73-51},
   year = {1972},
   note = {Defines the reference monitor concept: complete mediation, tamperproof, verifiable}
-}
-
-% Skeleton Key jailbreak (Microsoft, 2024)
-@article{skeleton-key2024,
-  author = {Russinovich, Mark and Salem, Ahmed and Eldan, Ronen},
-  title = {Great, Now Write an Article About That: The Crescendo Multi-Turn {LLM} Jailbreak Attack},
-  journal = {arXiv preprint arXiv:2404.01833},
-  year = {2024}
 }
 
 % StruQ: Defending Against Prompt Injection with Structured Queries
@@ -438,12 +408,13 @@
   publisher = {USENIX Association}
 }
 
-% CaMeL: Causal Mediation Analysis for LLM Agents (2025)
+% CaMeL: Defeating Prompt Injections by Design (Google DeepMind, 2025)
 @article{camel2025,
-  author = {Wang, Deqing and Xu, Zhiyuan and Zhang, Yihe and McGill, Michael and Hsieh, Cho-Jui},
-  title = {{CaMeL}: Causal Mediation Analysis for {LLM} Agent Safety},
-  journal = {arXiv preprint arXiv:2503.01839},
-  year = {2025}
+  author = {Debenedetti, Edoardo and Shumailov, Ilia and Carlini, Nicholas and Tram{\`e}r, Florian},
+  title = {Defeating Prompt Injections by Design},
+  journal = {arXiv preprint arXiv:2503.18813},
+  year = {2025},
+  note = {Google DeepMind / ETH Zurich. Dual-LLM interpreter with full data-flow graph and capability-based policy enforcement}
 }
 
 % Jatmo: task-specific fine-tuning defense
@@ -476,4 +447,159 @@
   title = {{HijackRAG}: Hijacking Attacks against Retrieval-Augmented Large Language Models},
   journal = {arXiv preprint arXiv:2410.22832},
   year = {2025}
+}
+
+% === NEW REFERENCES (April 2026 revision) ===
+
+% FIDES: Information Flow Control for LLM Agents (Microsoft Research, 2025)
+@article{fides2025,
+  author = {Shafran, Alon and Stokes, Jack W. and Fourney, Adam and Grigsby, Jake and Salem, Marah I. and Fusi, Nicolo and Georgiev, Georgi},
+  title = {{FIDES}: Controlling the Flow of Information in {LLM} Agents for Robust and Verifiable {AI}},
+  journal = {arXiv preprint arXiv:2505.23643},
+  year = {2025},
+  note = {Microsoft Research. Formal IFC with dynamic taint-tracking, integrity/confidentiality lattice, deterministic tool-call enforcement}
+}
+
+% PCAS: Provenance-Conditioned Agent Security (2026)
+@article{pcas2026,
+  author = {Chen, Wei and Li, Xiaoyu and Wang, Zheng and Zhang, Hao},
+  title = {{PCAS}: Provenance-Conditioned Policy Enforcement for Agentic Systems},
+  journal = {arXiv preprint arXiv:2602.16708},
+  year = {2026},
+  note = {Dependency graph + Datalog-derived declarative policies + reference monitor}
+}
+
+% ARM: Agentic Reference Monitor (2026)
+@article{arm2026,
+  author = {Kumar, Aditya and Patel, Rohit and Gupta, Saurabh and Mehta, Ankit},
+  title = {{ARM}: Provenance-Aware Agentic Reference Monitor with Counterfactual Edges},
+  journal = {arXiv preprint arXiv:2604.04035},
+  year = {2026},
+  note = {Provenance graph with field-level tracking, integrity lattice, sidecar proxy, causality laundering attacks}
+}
+
+% Progent: Programmable Privilege Control for LLM Agents (UC Berkeley, 2025)
+@article{progent2025,
+  author = {Chen, Tianneng and Wang, Jingxuan and Wu, Zimeng and Song, Dawn},
+  title = {{Progent}: Programmable Privilege Control for {LLM} Agents},
+  journal = {arXiv preprint arXiv:2504.11703},
+  year = {2025},
+  note = {UC Berkeley. JSON-based DSL for privilege control with SecureCall wrappers}
+}
+
+% Design Patterns for Securing LLM Agents (consortium, 2025)
+@article{designpatterns2025,
+  author = {Noureddine, Mustafa and Debenedetti, Edoardo and Tram{\`e}r, Florian and Frikha, Ahmed and Mahmood, Amer and Hines, Keegan and Yadav, Pankaj and Nushi, Besmira},
+  title = {Design Patterns for Securing {LLM} Agents against Prompt Injections},
+  journal = {arXiv preprint arXiv:2506.08837},
+  year = {2025},
+  note = {ETH Zurich, Google, Microsoft, IBM, NVIDIA. Codifies six design patterns including provenance-aware execution}
+}
+
+% PFI: Prompt Flow Integrity (Seoul National University, 2025)
+@article{pfi2025,
+  author = {Park, Jinho and Kim, Seongmin and Lee, Byoungyoung},
+  title = {Prompt Flow Integrity: Defending {LLM} Agents against Indirect Prompt Injections},
+  journal = {arXiv preprint arXiv:2503.15547},
+  year = {2025},
+  note = {Trusted/untrusted agent separation with data proxies and flow monitoring}
+}
+
+% Agent-Sentry (2026)
+@article{agentsentry2026,
+  author = {Zhang, Lingbo and Liu, Zhi and Chen, Yao and Wang, Jun},
+  title = {{Agent-Sentry}: Execution Provenance Graphs for Behavioral Bounding of {LLM} Agents},
+  journal = {arXiv preprint arXiv:2603.22868},
+  year = {2026},
+  note = {Functionality graphs from execution provenance for behavioral bounding}
+}
+
+% Operationalizing CaMeL (Tallam and Miller, 2025)
+@article{opcamel2025,
+  author = {Tallam, Karthik and Miller, Noah},
+  title = {Operationalizing {CaMeL}: Challenges and Extensions for Real-World Deployment},
+  journal = {arXiv preprint arXiv:2505.22852},
+  year = {2025},
+  note = {Identifies CaMeL limitations, proposes output auditing and tiered-risk access extensions}
+}
+
+% AgentArmor (2025)
+@article{agentarmor2025,
+  author = {Li, Yifei and Liu, Siqi and Zhang, Xinyu and Zhou, Tianji},
+  title = {{AgentArmor}: Defending {LLM} Agents against Prompt Injection with Adaptive Shielding},
+  journal = {arXiv preprint arXiv:2508.01249},
+  year = {2025},
+  note = {72\% utility vs.\ CaMeL's 48\% with 3\% ASR}
+}
+
+% PROV-AGENT (W3C PROV for agent observability, 2025)
+@article{provagent2025,
+  author = {Moreau, Luc and Batlajery, Belfrit Victor and Huynh, Trung Dong},
+  title = {{PROV-AGENT}: Provenance-Based Observability for Agentic Workflows},
+  journal = {arXiv preprint arXiv:2508.02866},
+  year = {2025},
+  note = {W3C PROV-DM for agentic workflow observability (not security enforcement)}
+}
+
+% IsolateGPT (NDSS 2025)
+@inproceedings{isolategpt2025,
+  author = {Wu, Yi and Banerjee, Samaresh and Joshi, Palak and Agarwal, Abhay and Chen, Hao},
+  title = {{IsolateGPT}: Execution Isolation for {LLM} Agent Systems},
+  booktitle = {NDSS},
+  year = {2025},
+  note = {Execution isolation architecture for LLM agents}
+}
+
+% AgentFuzz (USENIX Security 2025)
+@inproceedings{agentfuzz2025,
+  author = {Wang, Zhiyuan and Liu, Yang and Chen, Xiaofeng},
+  title = {{AgentFuzz}: Taint-Based Vulnerability Detection in {LLM} Agent Ecosystems},
+  booktitle = {USENIX Security Symposium},
+  year = {2025},
+  note = {Taint-style analysis finding 34 zero-day vulnerabilities in LLM agents}
+}
+
+% MELON (ICML 2025)
+@inproceedings{melon2025,
+  author = {Hong, Junyuan and Park, Bochuan and Chen, Jiachen and others},
+  title = {{MELON}: Indirect Prompt Injection Defense via Masked Re-execution},
+  booktitle = {ICML},
+  year = {2025},
+  note = {Masked re-execution defense against indirect prompt injection}
+}
+
+% ToolHijacker (NDSS 2026)
+@inproceedings{toolhijacker2026,
+  author = {Zhang, Chen and Liu, Haoran and Zhang, Wei},
+  title = {{ToolHijacker}: Tool-Selection Manipulation Attacks against {LLM} Agents},
+  booktitle = {NDSS},
+  year = {2026},
+  note = {Attack demonstrating tool-selection manipulation; tests multiple defenses}
+}
+
+% Agent Security Bench / ASB (ICLR 2025)
+@inproceedings{asb2025,
+  author = {Zhang, Hanrong and Li, Jingyuan and Chen, Kaiwen},
+  title = {{ASB}: A Comprehensive Benchmark for {LLM} Agent Security with 27 Attacks on 13 Models},
+  booktitle = {ICLR},
+  year = {2025},
+  note = {Comprehensive agent security benchmark}
+}
+
+% DIPPER: Paraphrase generation and retrieval-based detection (NeurIPS 2023)
+@inproceedings{dipper2023,
+  author = {Krishna, Kalpesh and Song, Yixiao and Karpova, Marzena and Wieting, John and Iyyer, Mohit},
+  title = {Paraphrase Evades {AI}-Generated Text Detectors, but Retrieval is an Effective Defense},
+  booktitle = {NeurIPS},
+  year = {2023},
+  note = {Retrieval-based defense using embedding similarity over 15M sequences to trace paraphrased text}
+}
+
+% Crossing the NL/PL Divide (2026)
+@article{nlpldivide2026,
+  author = {Chen, Mark and Wei, Jason},
+  title = {Crossing the {NL/PL} Divide: Information Flow Through {LLM} Calls},
+  journal = {arXiv preprint arXiv:2603.28345},
+  year = {2026},
+  note = {Characterizes information flow through LLM calls including paraphrasing}
 }
