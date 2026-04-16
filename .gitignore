@@ -40,3 +40,22 @@ evaluation/.env
 
 # Temporary
 *.tmp
+*.buggy_backup
+lmstudio_status.txt
+paper_current.pdf
+HANDOFF_*.md
+
+# One-off analysis/investigation scripts (not part of the codebase)
+analyze_*.py
+investigate_*.py
+check_lmstudio*.py
+rerun_*.sh
+run_taint_*.sh
+
+# Broken/abandoned experiment result directories
+results/agentdojo/
+results/agentdojo_quick/
+results/agentdojo_test/
+
+# Paper source (synced via Overleaf, not tracked in git)
+overleaf/
