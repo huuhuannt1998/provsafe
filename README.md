@@ -174,18 +174,3 @@ python scripts/update_paper_numbers.py
 python scripts/update_injecagent_numbers.py
 ```
 
-## Citation
-
-```bibtex
-@inproceedings{provsafe2026,
-  title     = {{PROVSAFE}: Provenance-Gated Policy Enforcement for Tool-Using {LLM} Agents},
-  author    = {Anonymous},
-  booktitle = {Proceedings of the ACM Conference on Computer and Communications Security (CCS)},
-  year      = {2026},
-  note      = {Under review}
-}
-```
-
-## License
-
-MIT
