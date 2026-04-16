@@ -20,7 +20,4 @@ Three policies ship with \sys{}: \emph{Default} (the evaluation policy: risk tie
 Proxy overhead is sub-millisecond: policy evaluation median 0.06\,ms (P95: 0.12\,ms), provenance queries median 0.82\,ms (P95: 1.8\,ms with 500+ graph nodes), argument validation median 0.15\,ms (P95: 0.3\,ms). End-to-end task runtime averages 20.21\,s vs.\ 12.35\,s undefended; the 7.86\,s difference is dominated by user confirmation delays (average 5.2\,s per confirmation) and LLM re-prompting after blocked calls (average 2.1\,s per re-prompt), not proxy computation. Memory footprint is $\sim$55\,MB with 1,000 provenance nodes; the embedding extension adds $\sim$90\,MB for the all-MiniLM-L6-v2 model weights.
 
 \paragraph{Evaluation Infrastructure.}
-Four local models (Llama-3.1-8B, Qwen2.5-7B, Gemma-2-9B, Phi-3.5-Mini; all Q4\_K\_M quantized) are served via LM Studio on an Apple M4 Pro (24\,GB RAM). GPT-4o-mini~\cite{openai-gpt4omini} is evaluated via the OpenAI API. Five repetitions with cryptographic per-trial seeds yield \textbf{26{,}500 total trials} (details in Section~\ref{subsec:methodology}).
-
-\paragraph{Availability.}
-Code will be released as open-source with documentation, policies, the full benchmark suite, and reproducible evaluation scripts. Installation: \texttt{pip install provsafe}.
+Four Q4\_K\_M-quantized local models (Llama-3.1-8B, Qwen2.5-7B, Gemma-2-9B, Phi-3.5-Mini) run on LM Studio (Apple M4 Pro, 24\,GB RAM); GPT-4o-mini~\cite{openai-gpt4omini} is called via the OpenAI API. Five cryptographically-seeded repetitions yield \textbf{26{,}500 total trials} (Section~\ref{subsec:methodology}). Code will be released open-source upon acceptance (\texttt{pip install provsafe}).

@@ -39,12 +39,4 @@ A defense for tool-using LLM agents must satisfy five security goals:
   \item \textbf{Usability}: Minimize false positives so the agent remains practical. Provenance-gated policies enable fine-grained trust decisions that maintain high task success rates.
 \end{enumerate}
 
-\sys{} provides three enforcement design invariants (formal statements and justifications in Appendix~\ref{sec:appendix-proofs}):
-\begin{enumerate}[leftmargin=1.5em]
-  \item \textbf{Complete Mediation}: every tool call passes through the enforcement proxy before execution---the agent has no direct path to tool executors.
-  \item \textbf{Policy Determinism}: for fixed policy, provenance graph, and decision context, repeated evaluations produce the same result (first-match semantics, no randomness).
-  \item \textbf{Conservative Trust Propagation}: trust labels propagate via the lattice meet $\sqcap$; no trust ``upgrade'' is possible without explicit user declassification. Taint monotonicity ($T(u)=\bot \Rightarrow T(v)=\bot$ for descendants $v$) holds by construction.
-\end{enumerate}
-
-\paragraph{Enforcement Soundness.}
-Properties 1--3 guarantee sound decisions \emph{if provenance is correctly resolved}. Provenance resolution is approximate (the LLM is opaque), so \sys{} uses a three-stage pipeline: substring matching, embedding similarity ($\theta = 0.45$, all-MiniLM-L6-v2), and conservative UNTRUSTED default. Effectiveness is evaluated in Section~\ref{sec:eval}.
+\sys{} provides three enforcement design invariants---\emph{complete mediation}, \emph{policy determinism}, and \emph{conservative trust propagation} (taint monotonicity)---with architectural justifications in Appendix~\ref{sec:appendix-proofs}. These guarantee sound decisions \emph{if provenance is correctly resolved}; since the LLM is opaque, \sys{} uses an approximate three-stage pipeline (substring match, embedding similarity at $\theta = 0.45$, conservative UNTRUSTED default) evaluated empirically in Section~\ref{sec:eval}.

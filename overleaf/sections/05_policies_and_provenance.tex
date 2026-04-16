@@ -15,15 +15,9 @@ Each rule specifies a name, applicable tools, conditions, and an action (ALLOW, 
 rules:
   - name: "Allow benign file reads"
     tools: ["fs.read"]
-    conditions:
-      path_prefix: "/home/user/"
-      provenance_trust: "trusted"
+    conditions: {path_prefix: "/home/user/",
+                 provenance_trust: "trusted"}
     action: ALLOW
-  - name: "Deny system file access"
-    tools: ["fs.read", "fs.write"]
-    conditions:
-      path_prefix: "/etc/"
-    action: DENY
   - name: "Confirm untrusted deletes"
     tools: ["fs.delete"]
     conditions: {provenance_trust: "untrusted"}
@@ -63,14 +57,7 @@ TOOL\_CALL & LLM proposes tool call & propagated & \texttt{fs.delete(\ldots)} \\
 \end{table}
 
 \paragraph{Formal Provenance Model.}
-\sys{} maintains a provenance graph adapted from the W3C PROV Data Model~\cite{prov-dm} (Fig.~\ref{fig:provenance-graph}, Table~\ref{tab:node-types}). Formally, the graph is a DAG $G = (V, E, T, \tau)$ where:
-\begin{itemize}[leftmargin=1.5em]
-  \item $V$ is a set of \emph{provenance nodes} (PROV-DM entities), each typed as INPUT (user commands), TOOL\_RESULT (tool outputs), DERIVED\_FACT (LLM-generated content), or TOOL\_CALL (proposed tool invocations).
-  \item $E \subseteq V \times V$ is a set of directed \emph{derivation edges} corresponding to the PROV-DM \texttt{wasDerivedFrom} relation: $(v_i, v_j) \in E$ means $v_i$ was derived from $v_j$.
-  \item $T: V \to \mathcal{L}$ assigns each node a trust label from the two-element lattice $\mathcal{L} = \{\top, \bot\}$ ($\top$ = TRUSTED, $\bot$ = UNTRUSTED), with $\bot \sqsubseteq \top$.
-  \item $\tau: V \to \mathbb{N}$ assigns a creation timestamp for temporal ordering.
-\end{itemize}
-Nodes are created at four points: (1)~when the user issues a command (INPUT, $T = \top$); (2)~when a tool returns a result from an external source (TOOL\_RESULT, $T = \bot$); (3)~when the LLM produces content referencing prior nodes (DERIVED\_FACT, $T$ computed by propagation); (4)~when the LLM proposes a tool invocation (TOOL\_CALL, used for policy evaluation). LLM-generated content with \emph{no traceable source nodes} also defaults to $\bot$ (UNTRUSTED)---the conservative choice is that a value with no provenance should not be assumed safe. Only values with at least one explicit trusted ancestor and no untrusted ancestors receive label $\top$. Critically, TOOL\_CALL trust reflects the \emph{origin of the intent}---who authorized the action---while TOOL\_RESULT trust reflects the \emph{origin of the content}---where the data came from. These are independent: a trusted user command triggers a tool call whose result is untrusted (external data). This captures \emph{why-provenance}~\cite{buneman2001provenance}---which source entities contributed to a derived entity---at the tool-call boundary. We do not track \emph{how-provenance} (the LLM's internal transformation) because the model is opaque.
+\sys{} maintains a DAG $G = (V, E, T, \tau)$ adapted from W3C PROV-DM~\cite{prov-dm} (Fig.~\ref{fig:provenance-graph}, Table~\ref{tab:node-types}): $V$ are typed provenance nodes (PROV-DM entities); $E$ are directed \texttt{wasDerivedFrom} edges; $T: V \to \mathcal{L}$ assigns trust labels from the two-element lattice $\mathcal{L} = \{\top, \bot\}$ with $\bot \sqsubseteq \top$; and $\tau: V \to \mathbb{N}$ records creation timestamps. LLM-generated content lacking traceable source nodes defaults to $\bot$ (conservative); only nodes with at least one explicit trusted ancestor \emph{and} no untrusted ancestors receive $\top$. TOOL\_CALL trust reflects \emph{origin of intent} (who authorized the action), while TOOL\_RESULT trust reflects \emph{origin of content} (where data came from)---these are independent: a trusted command may trigger a call whose result is untrusted. This captures \emph{why-provenance}~\cite{buneman2001provenance} at the tool-call boundary; \emph{how-provenance} (the LLM's internal transformation) is not tracked because the model is opaque.
 
 \paragraph{Trust Propagation.}
 Trust labels propagate via the lattice meet ($\sqcap$) over ancestors:
@@ -80,18 +67,10 @@ T(v) = \sqcap_{u \in \text{ancestors}(v)} T(u) = \begin{cases} \top & \text{if }
 \end{equation}
 This conservative propagation ensures monotonicity: once a node acquires the $\bot$ (UNTRUSTED) label through any ancestor, no subsequent derivation can restore $\top$ without explicit user declassification (a controlled \emph{downgrading} operation~\cite{difc-survey}).
 
-\paragraph{Why a Two-Element Lattice.}
-The binary lattice is the right design point (discussed in Section~\ref{sec:discussion}); multi-level trust for authenticated sources is future work.
-
-We state three formal properties of the provenance model (proofs in Appendix~\ref{sec:appendix-proofs}):
-\begin{enumerate}[leftmargin=1.5em]
-  \item \textbf{Propagation Soundness}: If $T(v) = \top$ for a TOOL\_CALL node $v$, then every source entity reachable from $v$ via $E$ has label $\top$. (Holds by induction over BFS depth.)
-  \item \textbf{Taint Monotonicity}: For any nodes $v_1, v_2$ where $v_1$ is an ancestor of $v_2$: $T(v_1) = \bot \Rightarrow T(v_2) = \bot$. (Follows directly from the $\sqcap$ definition.)
-  \item \textbf{Declassification Control}: The only operation that changes $T(v)$ from $\bot$ to $\top$ is an authenticated user confirmation. No agent action or tool result can upgrade trust.
-\end{enumerate}
+The two-element lattice establishes three formal properties by construction (detailed in Appendix~\ref{sec:appendix-proofs}): \emph{Propagation Soundness} ($T(v)=\top \Rightarrow$ all ancestors are $\top$), \emph{Taint Monotonicity} ($\bot$ propagates transitively), and \emph{Declassification Control} ($\bot \to \top$ requires authenticated user confirmation). Multi-level trust is future work.
 
 \paragraph{Provenance Queries.}
-At decision time, the policy engine queries the graph: \texttt{get\_sources(c)} returns all source nodes (why-provenance); \texttt{is\_trusted(c)} computes $\sqcap_{u \in \text{ancestors}(c)} T(u)$; \texttt{get\_untrusted\_sources(c)} returns $\bot$-labeled sources for user-facing explanations. All queries use BFS in $O(|V| + |E|)$; in practice $|V| < 100$ per session.
+The policy engine queries the graph via BFS in $O(|V|+|E|)$ (with $|V|<100$ per session): \texttt{get\_sources(c)} returns source nodes (why-provenance), \texttt{is\_trusted(c)} computes the ancestor meet, and \texttt{get\_untrusted\_sources(c)} returns $\bot$-labeled sources for user-facing explanations.
 
 \paragraph{Provenance Resolution Pipeline.}
 Provenance resolution determines whether a tool-call argument traces to untrusted content. \sys{} uses a three-stage pipeline:
@@ -102,5 +81,4 @@ Provenance resolution determines whether a tool-call argument traces to untruste
 \end{enumerate}
 The threshold $\theta = 0.45$ was selected via 5-fold cross-validation on 20 held-out paraphrase pairs, optimizing for $F_1$ score. The pipeline achieves 100\% provenance recall across 96 paraphrase tests (Section~\ref{subsec:paraphrase}), vs.\ 40.6\% for substring alone.
 
-\paragraph{Threshold Sensitivity.}
-A threshold sweep ($\theta \in [0.25, 0.70]$, Table~\ref{tab:threshold_sensitivity} in Appendix~\ref{sec:appendix-threshold}) confirms stability: ASR-IA and TSR vary by $<$0.5\% and $<$1.0\% in $[0.35, 0.55]$. The conservative Stage-3 default provides a safety net even if the threshold misclassifies.
+Sensitivity analysis confirms stability across $\theta \in [0.35, 0.55]$ (Table~\ref{tab:threshold_sensitivity}, Appendix~\ref{sec:appendix-threshold}); the conservative Stage-3 default is a safety net when $\theta$ misclassifies.
