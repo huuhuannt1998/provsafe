@@ -8,14 +8,7 @@ We address nine research questions: \textbf{RQ1:} How effective is \sys{} at blo
 \subsection{Methodology}
 \label{subsec:methodology}
 
-\paragraph{Benchmark and Models.}
-We evaluate 212 scenarios---172 attacks across 9 categories and 40 benign tasks---on five models spanning five vendor families: four local models (Meta-Llama-3.1-8B, Qwen2.5-7B, Gemma-2-9B, Phi-3.5-Mini; Q4\_K\_M quantized, served via LM Studio on Apple M4 Pro) and OpenAI GPT-4o-mini~\cite{openai-gpt4omini} via API.
-
-\paragraph{Baselines.}
-Five configurations isolate defense layers: (1)~\textbf{No Defense}: unfiltered; (2)~\textbf{Pattern Filter}: 47-rule Rebuff-derived~\cite{rebuff-defense} regex scanner; (3)~\textbf{Policy-Only}: identical to \sys{} but with provenance disabled (\texttt{has\_untrusted\_args = false}); (4)~\textbf{Taint-Everything}: all arguments marked untrusted (security upper-bound / usability lower-bound); (5)~\textbf{\sys{} (Full)}: complete system with provenance DAG, three-stage resolution, and policy evaluation.
-
-\paragraph{Protocol and Metrics.}
-Each configuration runs five repetitions per scenario-model pair with unique cryptographic seeds.\footnote{Seeds: SHA-256(scenario $\|$ system $\|$ model $\|$ rep); temperatures $T \in \{0.0, 0.10, 0.15, 0.20, 0.20\}$.} This yields \textbf{26{,}500 total trials} (16{,}960 primary + 4{,}240 Taint-Everything + 5{,}300 GPT-4o-mini). Metrics: ASR-IA (attack success rate on integrity/availability patterns), TSR (task success rate), FPR (false positive rate), and ASR-C (confidentiality, InjecAgent DS subset only). A tool call is ``dangerous'' if it matches deterministic patterns: delete, write to absolute path, unlock, or out-of-range temperature. All confidence intervals are 95\% Wilson-score~\cite{wilson1927probable}; pairwise significance uses Fisher exact tests with Bonferroni correction~\cite{cohen1988statistical}.
+We evaluate 212 scenarios (172 attacks across 9 categories, 40 benign tasks) on five models from five vendor families: four local models (Llama-3.1-8B, Qwen2.5-7B, Gemma-2-9B, Phi-3.5-Mini; Q4\_K\_M quantized via LM Studio on Apple M4 Pro) and GPT-4o-mini~\cite{openai-gpt4omini} via API. Five configurations isolate defense layers: \textbf{No Defense} (unfiltered); \textbf{Pattern Filter} (47-rule Rebuff-derived~\cite{rebuff-defense} regex); \textbf{Policy-Only} (\sys{} with provenance disabled); \textbf{Taint-Everything} (all arguments untrusted---security upper-bound); and \textbf{\sys{} (Full)}. Each configuration runs five repetitions per scenario-model pair with unique cryptographic seeds,\footnote{Seeds: SHA-256(scenario $\|$ system $\|$ model $\|$ rep); $T \in \{0.0, 0.10, 0.15, 0.20, 0.20\}$.} yielding \textbf{26{,}500 total trials} (16{,}960 primary + 4{,}240 Taint-Everything + 5{,}300 GPT-4o-mini). A call is ``dangerous'' if it matches deterministic patterns (delete, write to absolute path, unlock, out-of-range temperature). Metrics: ASR-IA, TSR, FPR, and ASR-C (confidentiality, InjecAgent DS subset). Confidence intervals are 95\% Wilson-score~\cite{wilson1927probable}; pairwise significance uses Fisher exact tests with Bonferroni correction~\cite{cohen1988statistical}.
 
 \subsection{RQ1: Security Effectiveness}
 
@@ -63,19 +56,7 @@ Taint-Everything  & 0.00\% $\pm$ 0.1 & 9.00\% $\pm$ 2.0 & Usability collapse ($>
 }
 \end{table}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/fig1_asr_comparison.pdf}
-\caption{Defense mechanism breakdown. Boundary enforcement (23.5\%) and model refusal (27.2\%) together prevent over 50\% of attacks before any dangerous tool call executes.}
-\label{fig:asr_comparison}
-\end{figure}
-
-Tables~\ref{tab:main_results}--\ref{tab:baseline_comparison} and Fig.~\ref{fig:asr_comparison} present the main results. \sys{} achieves \textbf{1.02\% $\pm$ 0.34 ASR-IA} with \textbf{95.00\% $\pm$ 1.52 TSR} across 4{,}240 trials---a 24$\times$ reduction versus No Defense and 7$\times$ versus Pattern Filter. All pairwise ASR-IA differences are significant ($p_{\text{adj}} < 0.001$) except \sys{} vs.\ Policy-Only ($p_{\text{adj}} = 0.099$); the decisive comparison is InjecAgent (Table~\ref{tab:injecagent}).
-
-On our benchmark, Policy-Only also achieves low ASR-IA (1.72\%) because attack tools are syntactically identifiable. On InjecAgent, Policy-Only reduces ASR to only 12.34\% while \sys{} achieves 4.22\%---a 6.1$\times$ reduction versus No Defense---demonstrating that provenance is essential when attacker tools are legitimate but arguments originate from attacker-controlled content. Per-category results (Table~\ref{tab:attack-categories} in Appendix~\ref{sec:appendix-categories}) show encoding obfuscation (2.78\%) and privilege escalation (3.75\%) as the primary residual categories.
-
-\paragraph{False Positives.}
-All 40 false positives (5.0\% FPR) trace to 3 benign scenarios where models map non-temperature commands to \texttt{set\_temperature()}, triggering range checks. The DAG correctly classifies all arguments as trusted; false positives stem from overly broad validation rules, not provenance misclassification.
+Tables~\ref{tab:main_results}--\ref{tab:baseline_comparison} present the main results. \sys{} achieves \textbf{1.02\% $\pm$ 0.34 ASR-IA} with \textbf{95.00\% $\pm$ 1.52 TSR} across 4{,}240 trials---a 24$\times$ reduction versus No Defense and 7$\times$ versus Pattern Filter. All pairwise ASR-IA differences are significant ($p_{\text{adj}} < 0.001$) except \sys{} vs.\ Policy-Only ($p_{\text{adj}} = 0.099$); the decisive comparison is InjecAgent (Table~\ref{tab:injecagent}). On our benchmark, Policy-Only also achieves low ASR-IA (1.72\%) because attack tools are syntactically identifiable; on InjecAgent, it reduces ASR only to 12.34\% while \sys{} achieves 4.22\%---6.1$\times$ vs.\ No Defense---demonstrating that provenance is essential when attacker tools are legitimate but arguments originate from attacker-controlled content. Per-category results (Appendix~\ref{sec:appendix-categories}) show encoding obfuscation (2.78\%) and privilege escalation (3.75\%) as the primary residual categories. All 40 false positives (5.0\% FPR) trace to 3 benign scenarios where models map non-temperature commands to \texttt{set\_temperature()}, triggering range checks; the DAG correctly classifies all arguments as trusted.
 
 \subsection{RQ2--3, RQ5: Components, Usability, Provenance Accuracy}
 

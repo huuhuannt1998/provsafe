@@ -16,22 +16,19 @@ Recall the attack from Section~\ref{sec:intro}: a device named ``Living Room Lig
   \label{fig:architecture}
 \end{figure*}
 
-\sys{} addresses this via \emph{provenance-gated policy enforcement} in five steps (Fig.~\ref{fig:architecture}).
-
-\paragraph{Step 0: Pre-LLM Input Screening.}
-Before invoking the LLM, \sys{} screens input for jailbreak attempts (``ignore previous instructions,'' DAN-style prompts), multi-turn chaining patterns, and encoding obfuscation (Base64, hexadecimal, ROT13, Unicode). Matching requests are rejected immediately.
+\sys{} addresses this via \emph{provenance-gated policy enforcement} in four steps (Fig.~\ref{fig:architecture}).
 
 \paragraph{Step 1: Label Inputs by Trust.}
-User commands and system prompts are marked TRUSTED. Device names, calendar events, file contents, and other tool results are marked UNTRUSTED, since they originate from external sources an attacker may control.
+User commands and system prompts are marked TRUSTED; device names, calendar events, file contents, and other tool results are marked UNTRUSTED since they originate from attacker-controllable sources. Input is also screened for jailbreak attempts, chaining patterns, and encoding obfuscation (Base64, hex, ROT13, Unicode); matching requests are rejected.
 
 \paragraph{Step 2: Track Provenance.}
-\sys{} maintains a DAG linking derived facts to their sources. When the agent summarizes ``Living Room Light requests admin access,'' that summary traces back to the untrusted device name. Provenance resolution uses substring matching, embedding similarity ($\theta = 0.45$), and conservative default labeling (Section~\ref{sec:policies}).
+\sys{} maintains a DAG linking derived facts to their sources. When the agent summarizes ``Living Room Light requests admin access,'' that summary traces back to the untrusted device name. Resolution uses substring matching, embedding similarity ($\theta = 0.45$), and a conservative default (Section~\ref{sec:policies}).
 
 \paragraph{Step 3: Validate and Enforce Policies.}
-When the agent proposes a tool call, the enforcement proxy intercepts it. \emph{Argument validation} checks for encoded payloads, path traversal, and command injection. \emph{Policy evaluation} considers the tool's risk tier, argument provenance, scope constraints, and temporal conditions. For \texttt{fs.read("/etc/passwd")} originating from an untrusted device name, the policy denies; for \texttt{fs.write("/notes/summary.txt")} from a trusted user command, it allows.
+When the agent proposes a tool call, the proxy intercepts it: \emph{argument validation} checks for encoded payloads, path traversal, and command injection; \emph{policy evaluation} considers risk tier, provenance, scope constraints, and temporal conditions. For \texttt{fs.read("/etc/passwd")} from an untrusted device name, the policy denies; for \texttt{fs.write("/notes/summary.txt")} from a trusted user command, it allows.
 
 \paragraph{Step 4: User Confirmation When Needed.}
-If a policy evaluates to REQUIRE\_CONFIRMATION, \sys{} prompts the user with the proposed tool call, applicable policies, and the provenance chain showing which sources influenced the request. Execution proceeds only after explicit user approval.
+If a policy evaluates to REQUIRE\_CONFIRMATION, \sys{} prompts the user with the proposed call, applicable policies, and the provenance chain; execution proceeds only after explicit approval.
 
 \subsection{Architecture}
 
