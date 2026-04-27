@@ -159,14 +159,19 @@ def get_tool_risk(tool_name: str) -> str:
 
 
 def _extract_text(content: Any) -> str:
-    """Extract text from message content (handles string or list of blocks)."""
+    """Extract text from message content (handles string or list of blocks).
+
+    AgentDojo content blocks use key 'content' (TextContentBlock schema);
+    OpenAI-style blocks use key 'text'. Accept both for robustness.
+    """
     if isinstance(content, str):
         return content
     if isinstance(content, list):
         parts = []
         for block in content:
             if isinstance(block, dict):
-                parts.append(block.get("text", ""))
+                # Prefer 'content' (AgentDojo), fall back to 'text' (OpenAI-style)
+                parts.append(block.get("content") or block.get("text") or "")
             elif isinstance(block, str):
                 parts.append(block)
         return " ".join(parts)
@@ -325,8 +330,12 @@ def _is_tainted(
 
 
 def _text_content_block(text: str) -> Dict[str, str]:
-    """Create a text content block for ChatToolResultMessage."""
-    return {"type": "text", "text": text}
+    """Create a text content block for ChatToolResultMessage.
+
+    Uses AgentDojo's TextContentBlock schema (key='content', not 'text').
+    AgentDojo calls c["content"] on blocks downstream; using 'text' raises KeyError.
+    """
+    return {"type": "text", "content": text}
 
 
 class PROVSAFEToolsExecutor(ToolsExecutor):

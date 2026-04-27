@@ -56,6 +56,11 @@ run_taint_*.sh
 results/agentdojo/
 results/agentdojo_quick/
 results/agentdojo_test/
+results/agentdojo_overnight_A/
+results/agentdojo_smoke/
+
+# Local agent guidance (not synced with collaborators)
+CLAUDE.md
 
 # Paper source (synced via Overleaf, not tracked in git)
 overleaf/
