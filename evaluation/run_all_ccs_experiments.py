@@ -20,6 +20,7 @@ Usage:
 """
 
 import sys
+import os
 import json
 import time
 import re
@@ -40,9 +41,9 @@ from src.enforcement_proxy import EnforcementProxy
 RESULTS_DIR = ROOT / "results" / "ccs_final"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── API Config ──────────────────────────────────────────────────────────
-API_URL = "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions"
-API_KEY = "sk-a6af2053d49649d2925ff91fef71cb65"
+# ── API Config (env-overridable; defaults to CCI cluster) ─────────────────
+API_URL = os.environ.get("PROVSAFE_API_URL", "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions")
+API_KEY = os.environ.get("PROVSAFE_API_KEY", "")
 
 AGENT_MODELS = [
     "gpt-oss-120b",
@@ -1731,10 +1732,12 @@ def run_exp_adaptive(model: str = "openai/gpt-oss-120b") -> Dict:
         response = llm_call(ADAPTIVE_SYSTEM_PROMPT, request, model, temperature=0.3)
         latency = time.time() - t0
 
-        # Parse tool call
+        # Parse tool call (some models emit a JSON *list* of calls; take the first dict)
         parsed = parse_json_response(response)
-        tool = parsed.get("tool") if parsed else None
-        args = parsed.get("args", {}) if parsed else {}
+        if isinstance(parsed, list):
+            parsed = next((x for x in parsed if isinstance(x, dict)), None)
+        tool = parsed.get("tool") if isinstance(parsed, dict) else None
+        args = parsed.get("args", {}) if isinstance(parsed, dict) else {}
 
         is_benign = sc["malicious_tool"] is None
         if is_benign:

@@ -62,7 +62,7 @@ SEQUENTIAL_MODELS = [
 CCI_URL = "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions"
 CCI_KEY = os.getenv(
     "OPENWEBUI_API_KEY",
-    "sk-a6af2053d49649d2925ff91fef71cb65",
+    "",
 )
 
 CCI_MODELS = [

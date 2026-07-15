@@ -18,7 +18,7 @@ load_dotenv()
 OPENWEBUI_URL = os.getenv(
     "OPENWEBUI_URL", "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions"
 )
-OPENWEBUI_API_KEY = os.getenv("OPENWEBUI_API_KEY", "sk-a6af2053d49649d2925ff91fef71cb65")
+OPENWEBUI_API_KEY = os.getenv("OPENWEBUI_API_KEY", "")
 
 # LLM Models for Agent and Oracle
 AGENT_MODELS = [

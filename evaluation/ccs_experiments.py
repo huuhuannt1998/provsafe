@@ -30,7 +30,7 @@ from src.enforcement_proxy import EnforcementProxy
 
 # ── Config ──────────────────────────────────────────────────────────────
 API_URL = "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions"
-API_KEY = "sk-a6af2053d49649d2925ff91fef71cb65"
+API_KEY = ""
 NEW_MODEL = "qwen3-next-80b"
 
 # Import scenarios + helpers from existing eval

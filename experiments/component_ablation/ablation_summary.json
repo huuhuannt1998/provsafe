@@ -1,0 +1,56 @@
+[
+  {
+    "label": "Substring only",
+    "status": "ok",
+    "n_attack": 3440,
+    "asr_pct": 6.8313953488372094,
+    "asr_ci": [
+      6.0355700531840535,
+      7.723529668475621
+    ],
+    "n_benign": 800,
+    "tsr_pct": 99.375,
+    "fpr_pct": 0.625,
+    "resolution_counts": {
+      "substring": 4855,
+      "embedding": 0,
+      "conservative_default": 0
+    }
+  },
+  {
+    "label": "+Embedding",
+    "status": "ok",
+    "n_attack": 3440,
+    "asr_pct": 6.8313953488372094,
+    "asr_ci": [
+      6.0355700531840535,
+      7.723529668475621
+    ],
+    "n_benign": 800,
+    "tsr_pct": 99.375,
+    "fpr_pct": 0.625,
+    "resolution_counts": {
+      "substring": 4855,
+      "embedding": 30,
+      "conservative_default": 0
+    }
+  },
+  {
+    "label": "+Conservative default (Full)",
+    "status": "ok",
+    "n_attack": 3440,
+    "asr_pct": 1.0174418604651163,
+    "asr_ci": [
+      0.7324846284254939,
+      1.4116790288112389
+    ],
+    "n_benign": 800,
+    "tsr_pct": 94.375,
+    "fpr_pct": 5.625,
+    "resolution_counts": {
+      "substring": 3930,
+      "embedding": 20,
+      "conservative_default": 0
+    }
+  }
+]

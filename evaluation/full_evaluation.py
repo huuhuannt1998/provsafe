@@ -19,7 +19,7 @@ from baseline_systems import create_system
 
 # Configuration
 API_URL = "http://cci-siscluster1.charlotte.edu:8080/api/chat/completions"
-API_KEY = "sk-a6af2053d49649d2925ff91fef71cb65"
+API_KEY = ""
 
 MODELS = [
     "openai/gpt-oss-120b",

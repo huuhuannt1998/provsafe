@@ -339,6 +339,8 @@ def call_llm(
                 time.sleep(wait)
                 continue
 
+            if resp.status_code >= 400 and os.environ.get("PROVSAFE_DEBUG_HTTP"):
+                print(f"  [HTTP {resp.status_code}] body: {resp.text[:400]}")
             resp.raise_for_status()
             return resp.json()
 
